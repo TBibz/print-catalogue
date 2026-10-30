@@ -12,7 +12,7 @@ Auth), hosted on Vercel.
 
 1. Copy `.env.local.example` to `.env.local` and fill in the Supabase values.
 2. `npm install`
-3. `npm run dev`, then open http://localhost:3000
+3. `npm run dev`, then open http://localhost:4000
 
 ## Database
 
