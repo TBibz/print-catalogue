@@ -1,5 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { signOut } from "@/app/actions/auth";
+import { getCurrentProfile } from "@/lib/auth";
+
+const navLink =
+  "rounded-md px-2 py-1.5 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900";
 
 export function SiteHeader() {
   return (
@@ -9,12 +14,13 @@ export function SiteHeader() {
           Print Catalogue
         </Link>
         <nav className="flex flex-1 items-center gap-4 text-sm">
-          <Link
-            href="/catalogue"
-            className="rounded-md px-2 py-1.5 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
-          >
+          <Link href="/catalogue" className={navLink}>
             Catalogue
           </Link>
+          {/* Checking the role needs the login cookie, so it streams in. */}
+          <Suspense fallback={null}>
+            <AdminLinks />
+          </Suspense>
         </nav>
         <form action={signOut}>
           <button
@@ -26,5 +32,16 @@ export function SiteHeader() {
         </form>
       </div>
     </header>
+  );
+}
+
+// Links only the admin sees.
+async function AdminLinks() {
+  const profile = await getCurrentProfile();
+  if (profile?.role !== "admin") return null;
+  return (
+    <Link href="/admin/queue" className={navLink}>
+      Queue
+    </Link>
   );
 }

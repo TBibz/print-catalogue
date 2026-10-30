@@ -48,6 +48,19 @@ export async function updateSession(request: NextRequest) {
     return redirectKeepingCookies(request, response, "/catalogue");
   }
 
+  // Admin pages: requesters are sent back to the catalogue.
+  // (Each admin page checks again, and RLS protects the data itself.)
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data!.claims.sub)
+      .maybeSingle();
+    if (profile?.role !== "admin") {
+      return redirectKeepingCookies(request, response, "/catalogue");
+    }
+  }
+
   return response;
 }
 
