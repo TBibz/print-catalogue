@@ -30,8 +30,8 @@ async function QueueData() {
   try {
     const [categories, models, lines] = await Promise.all([
       loadCategories(supabase),
-      // Include retired models: their requests still need printing.
-      loadModels(supabase, { includeHidden: true }),
+      // Retired ("hidden") models are left out, so their lines don't show.
+      loadModels(supabase),
       loadRequestLines(supabase),
     ]);
     const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
@@ -39,7 +39,7 @@ async function QueueData() {
 
     rows = lines.flatMap((line) => {
       const model = modelsById.get(line.model_id);
-      if (!model) return [];
+      if (!model) return []; // a retired model
       return [
         {
           line,

@@ -26,6 +26,14 @@ type Slot = { key: string; line: RequestLine | null; scale: string | null };
 
 const ALL = "all";
 
+function slotsFromLines(lines: RequestLine[]) {
+  const map: Record<string, Slot[]> = {};
+  for (const line of lines) {
+    (map[line.model_id] ??= []).push({ key: line.id, line, scale: line.scale });
+  }
+  return map;
+}
+
 // The blank slot every model shows when it has no request lines. Its key
 // stays the same once saved, so the boxes keep focus while you type.
 const blankSlot = (modelId: string): Slot => ({
@@ -48,13 +56,17 @@ export function CatalogueView({
   const [myRequestsOnly, setMyRequestsOnly] = useState(false);
 
   // Request slots per model, starting from the saved lines.
-  const [slotsByModel, setSlotsByModel] = useState<Record<string, Slot[]>>(() => {
-    const map: Record<string, Slot[]> = {};
-    for (const line of lines) {
-      (map[line.model_id] ??= []).push({ key: line.id, line, scale: line.scale });
-    }
-    return map;
-  });
+  const [slotsByModel, setSlotsByModel] = useState(() => slotsFromLines(lines));
+
+  // Next.js keeps this page alive in the background when you visit another
+  // page, so coming back shows the old state. When the server sends fresh
+  // lines (e.g. after edits in the queue), reload them. Tabs, search and the
+  // filter stay as they were. `version` makes the boxes reload too.
+  const [synced, setSynced] = useState({ lines, version: 0 });
+  if (lines !== synced.lines) {
+    setSynced({ lines, version: synced.version + 1 });
+    setSlotsByModel(slotsFromLines(lines));
+  }
 
   // Attach the category name to each model, and sort once.
   const rows = useMemo(() => {
@@ -220,6 +232,7 @@ export function CatalogueView({
                 key={r.id}
                 model={r}
                 slots={slotsByModel[r.id]}
+                version={synced.version}
                 onSaved={handleSaved}
                 onRemoved={handleRemoved}
                 onAddSize={handleAddSize}
@@ -265,12 +278,14 @@ function TabButton({
 const ModelRow = memo(function ModelRow({
   model,
   slots: storedSlots,
+  version,
   onSaved,
   onRemoved,
   onAddSize,
 }: {
   model: Row;
   slots: Slot[] | undefined;
+  version: number;
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
   onAddSize: (modelId: string, scale: string | null) => void;
@@ -308,7 +323,7 @@ const ModelRow = memo(function ModelRow({
       <div className="col-span-2 space-y-2 lg:col-span-1">
         {slots.map((slot, i) => (
           <LineEditor
-            key={slot.key}
+            key={`${slot.key}@${version}`}
             model={model}
             slot={slot}
             hasSizes={hasSizes}

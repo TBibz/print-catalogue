@@ -25,6 +25,15 @@ const COLUMNS =
 export function QueueView({ initialRows }: { initialRows: QueueRow[] }) {
   const [rows, setRows] = useState(initialRows);
 
+  // Next.js keeps this page alive in the background when you visit another
+  // page. When the server sends fresh rows on your way back (e.g. new
+  // requests from the catalogue), show those. `version` reloads the boxes.
+  const [synced, setSynced] = useState({ initialRows, version: 0 });
+  if (initialRows !== synced.initialRows) {
+    setSynced({ initialRows, version: synced.version + 1 });
+    setRows(initialRows);
+  }
+
   const handleSaved = useCallback((id: string, line: RequestLine) => {
     setRows((prev) =>
       prev.map((r) => (r.line.id === id ? { ...r, line, urgency: line.urgency } : r)),
@@ -75,7 +84,7 @@ export function QueueView({ initialRows }: { initialRows: QueueRow[] }) {
           <ul>
             {rows.map((r) => (
               <QueueLine
-                key={r.line.id}
+                key={`${r.line.id}@${synced.version}`}
                 row={r}
                 onSaved={handleSaved}
                 onDeleted={handleDeleted}
