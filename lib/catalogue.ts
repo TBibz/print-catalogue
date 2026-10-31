@@ -10,7 +10,7 @@ export type Category = {
   colour_hex: string; // highlights it in the catalogue sidebar
 };
 
-// A row from the catalogue_models view (models without admin_notes).
+// A row from catalogue_models() (models without admin_notes).
 export type CatalogueModel = {
   id: string;
   code: string;
@@ -53,7 +53,7 @@ export function compareModels(
 }
 
 // The NEW badge shows while the flag is on AND fewer than 4 have been printed
-// successfully (model_print_totals in 0008_print_jobs.sql).
+// successfully (model_print_totals() in 0016_security_advisor.sql).
 export const NEW_BADGE_PRINT_LIMIT = 4;
 
 export function showNewBadge(

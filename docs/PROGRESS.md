@@ -125,6 +125,13 @@ _Last updated: 2026-10-31 (sticky headings, auto-hiding nav)_
 10. **Home-screen app** (fdde534): `public/manifest.webmanifest`, icons generated with next/og, Apple web-app tags; proxy.ts skips `.webmanifest` so the manifest loads without logging in
 - SQL for items 1, 6–7 and 9 was checked in PGlite. Items 2–5 were checked in the browser pane with sample data (temporary preview page, not committed). The manifest and icons were checked against a local production server (they load without logging in; pages still need login)
 
+### Security Advisor fixes: Done (run `0016` in Supabase straight after this deploys)
+- `0016_security_advisor.sql`: the five "Security Definer View" views (`catalogue_models`, `request_line_printing`, `model_print_totals`, `category_model_counts`, `colour_options`) all read tables Dad can't see under RLS, so none could switch to `security_invoker`. Each became a `security definer` function with the same name and columns (`set search_path = ''`, callable by logged-in users only), and the views were dropped. The app calls them with `.rpc()` in `lib/data.ts`
+- `rls_auto_enable()` (made by Supabase) can no longer be called by `public`, `anon` or `authenticated`
+- Every policy calling `auth.uid()` / `is_admin()` now wraps it in `(select …)` (profiles, models, notepad, printers, materials, settings, print jobs and items, monthly money, model-images storage)
+- `categories`: "admin write" (which also covered reading) split into admin insert / update / delete, so "read" is the only SELECT policy
+- Checked in PGlite: all five functions return exactly what the views did, for both admin and Dad; logged-out users can't call them; category, notepad and profile rules behave as before; safe to run twice
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -146,6 +153,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0013_category_counts.sql` | 8 | `category_model_counts` view | ☐ |
 | `0014_category_printer_colours.sql` | 8 | `colour_hex` on categories and printers | ☐ |
 | `0015_bulk_default_scale.sql` | 8 | `set_category_default_scale()` | ☐ |
+| `0016_security_advisor.sql` | 8 | the five requester views become functions, `rls_auto_enable()` locked down, faster policies, categories policies split | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -153,7 +161,7 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 
 **Loose ends**
 - Phase 6a pages haven't been clicked through in a browser yet: that needs `0008` run in Supabase first. Use the Phase 6a test script.
-- The catalogue and queue read the new `request_line_printing` view, so they show an error until `0008` has been run.
+- The catalogue and queue call `catalogue_models()`, `request_line_printing()` and the other `0016` functions, so they show an error until `0016` has been run.
 - History shows the latest 200 jobs only (enough for now; add paging later if needed).
 - Items on a printing job can't be edited; cancel it and start a new plate instead.
 - Cancelled jobs can't be reverted.
@@ -178,6 +186,7 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - Money: payments and costs are typed per month (not per purchase or payment). The running total only counts months from the start month; anything before goes in the opening balance.
 - The month list is generated from the start month to this month, so a month with nothing typed still shows (as £0).
 - Job RPCs are `security definer` with an admin check at the top; helper functions are not callable by the app.
+- What Dad may see of admin-only tables comes from `security definer` functions that return only safe columns (not views), so Supabase's Security Advisor is happy. They are callable by any logged-in user, so the Advisor may still list them as a warning ("Authenticated can execute SECURITY DEFINER function"); that's intended.
 - Colours are set per category (has_colour_options), not per model. The list of colours is every filament with "Offer as colour" ticked (out-of-stock ones greyed out).
 - `materials.colour_hex` is the only source of a material's displayed colour.
 - When a request line is recreated (edit result, revert, delete), it keeps its colour even if that colour is now out of stock: `pj_put_back` sets a transaction-only flag that the colour check respects.

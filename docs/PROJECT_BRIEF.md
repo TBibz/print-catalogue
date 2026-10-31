@@ -24,7 +24,7 @@ Only these two users. No public sign-up.
 - UK English in the UI. Currency is GBP (£).
 - Money everywhere is shown as "£1,234.56" (two decimals, thousands separators) and negatives as "−£12.34" (`formatMoney` in `lib/money.ts`). Money boxes have a fixed "£" inside on the left; only the number is typed, and "12", "12.5" and "1,200" are all accepted (`components/money-input.tsx`). Amounts are stored pence-accurate (`numeric(…, 2)`).
 - **Desktop/laptop first**, but layouts must still work on a phone. Installable as a home-screen / dock app ("Print Catalogue", `public/manifest.webmanifest`, opens without browser bars).
-- **Reads never get silently cut off:** Supabase returns at most "Max rows" rows per request. Lists are read with `fetchAll()` (`lib/fetch-all.ts`) in pages with a stable order; counts and totals come from the database (e.g. `category_model_counts`); a deliberate cap says so ("Showing latest 200 of N"). See CLAUDE.md.
+- **Reads never get silently cut off:** Supabase returns at most "Max rows" rows per request. Lists are read with `fetchAll()` (`lib/fetch-all.ts`) in pages with a stable order; counts and totals come from the database (e.g. `category_model_counts()`); a deliberate cap says so ("Showing latest 200 of N"). See CLAUDE.md.
 - Clean, minimal look: white/light background (model renders are on pure white), clear typography, no clutter. Large enough click targets for an older user.
 - Tomi is a beginner coder. Keep code readable, add short comments on non-obvious logic, and always finish a task with a plain-English checklist of anything Tomi must do by hand.
 
@@ -33,7 +33,8 @@ Only these two users. No public sign-up.
 - `admin` (Tomi): full read/write on everything.
 - `requester` (Dad): read the catalogue (except admin-only fields); create, update and delete request lines; read print status for his requests; write notepad lines and edit/delete his own. Cannot see costs, charges, materials, printers, print job details or admin notes.
 - A `profiles` table links each auth user to a role. Provide an SQL helper `is_admin()` used by RLS policies.
-- Admin-only columns (e.g. `models.admin_notes`) are exposed to the requester only through a view or select that excludes them.
+- Admin-only columns (e.g. `models.admin_notes`) are exposed to the requester only through a `security definer` function that returns the safe columns (`catalogue_models()` for models without `admin_notes`). No `security definer` views (Supabase's Security Advisor flags them). Such functions use `set search_path = ''`, are revoked from `public` and `anon`, and granted to `authenticated`.
+- RLS policies wrap `auth.uid()` and `is_admin()` in `(select …)` so they run once per query, and each table has at most one permissive policy per action.
 
 ## 4. Data model (target design)
 
@@ -45,7 +46,7 @@ Build tables only when their phase is reached. Names and fields below are the ta
 
 ### categories
 - `id`, `name` (unique, e.g. "STAR WARS"), `sort_order` (int: the category's position, 1 = first; set by drag-and-drop on the Categories page and saved with `reorder_categories()`; new categories go last), `has_colour_options` (bool, default false; `0010_colours.sql` sets it for BASES), `colour_hex` (default grey; highlights the category in the catalogue sidebar)
-- `category_model_counts` view: total and visible (not retired) models per category, for the sidebar and Categories page.
+- `category_model_counts()` function: total and visible (not retired) models per category, for the sidebar and Categories page.
 - `set_category_default_scale(category, scale, only_unset, add_scales, dry_run)`: sets the default scale on a category's models (only those with none, or all), optionally adding other sizes; the dry run returns how many would change.
 
 ### models
@@ -84,7 +85,7 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 - `charge_overridden` (bool): false = a trigger keeps `charge_per_unit` at 2 × cost; true = set by hand and left alone
 - `in_stock` (bool), `offer_as_colour` (bool: shown as a colour choice for categories with colour options, while also in stock)
 - `active` (bool): false = retired, kept for history, hidden from new print jobs
-- Printers, materials and settings are admin-only. The requester sees colours only through the `colour_options` view (id, name, colour, colour_hex, available, in_stock; no prices): every filament offered as a colour (in stock or not, but not retired), plus any colour an existing request still uses.
+- Printers, materials and settings are admin-only. The requester sees colours only through the `colour_options()` function (id, name, colour, colour_hex, available, in_stock; no prices): every filament offered as a colour (in stock or not, but not retired), plus any colour an existing request still uses.
 - Later: individual spools/bottles and remaining amount.
 
 ### print_jobs (Phase 6) — one job = one plate
@@ -96,7 +97,7 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
   - **FDM (Centauri Carbon)**, required: `est_weight_g`, `material_id` (dropdown of FDM materials). `my_cost` and `charge` are calculated from the material. Optional: `print_hours` + `print_minutes`.
 - Store all of these as nullable columns on print_jobs. Validate the required set per printer type in the form and in the RPC.
 - Money (all editable): `my_cost` + `my_cost_overridden`, `charge` + `charge_overridden` (bool). When not overridden, the database recalculates them whenever the job changes.
-- Admin only (RLS). The requester sees printing amounts only through the `request_line_printing` view (request_line_id + printing, nothing else) and printed totals through `model_print_totals` (model_id + printed_total).
+- Admin only (RLS). The requester sees printing amounts only through the `request_line_printing()` function (request_line_id + printing, nothing else) and printed totals through `model_print_totals()` (model_id + printed_total).
 
 ### print_job_items (Phase 6)
 - `id`, `job_id`, `model_id` (nullable, no cascade: print history blocks deleting a model), `free_text_name` (for things not in the catalogue), `request_line_id` (nullable; set to null if the line is deleted), `scale`, `colour_material_id` (copied from the request line; null = any colour)

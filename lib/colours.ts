@@ -3,7 +3,7 @@
 // A material's true colour is materials.colour_hex (set with a colour
 // picker on the Materials page), the only source of colour in the app.
 
-// A row from the colour_options view (0011): names, colour and stock only,
+// A row from colour_options() (0016): names, colour and stock only,
 // so the requester can read it.
 export type ColourOption = {
   id: string;

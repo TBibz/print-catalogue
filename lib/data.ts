@@ -23,7 +23,16 @@ import { fetchAll } from "@/lib/fetch-all";
 //
 // Every list is read with fetchAll() (see lib/fetch-all.ts): Supabase only
 // returns up to "Max rows" rows per request and silently drops the rest.
-// Counts and totals are worked out in the database (views / functions).
+// Counts and totals are worked out in the database (functions).
+//
+// The requester's safe slices of admin-only tables (models without
+// admin_notes, printing amounts, print totals, model counts, colours) are
+// functions called with .rpc() (0016_security_advisor.sql). Filters, order
+// and .range() work on them just like on a table.
+
+// What a list query resolves to. .rpc() results can't use .returns<T[]>(),
+// so they are cast to this instead.
+type Rows<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
 export async function loadCategories(supabase: SupabaseClient) {
   return fetchAll<Category>((from, to) =>
@@ -37,25 +46,25 @@ export async function loadCategories(supabase: SupabaseClient) {
   );
 }
 
-// Model counts per category, counted in the database (0013).
+// Model counts per category, counted in the database (0016).
 export type CategoryCounts = Record<string, { total: number; visible: number }>;
+type CountRow = { category_id: string; total_models: number; visible_models: number };
 
 export async function loadCategoryCounts(supabase: SupabaseClient): Promise<CategoryCounts> {
-  const rows = await fetchAll<{ category_id: string; total_models: number; visible_models: number }>(
+  const rows = await fetchAll<CountRow>(
     (from, to) =>
       supabase
-        .from("category_model_counts")
+        .rpc("category_model_counts")
         .select("category_id, total_models, visible_models")
         .order("category_id")
-        .range(from, to)
-        .returns<{ category_id: string; total_models: number; visible_models: number }[]>(),
+        .range(from, to) as unknown as Rows<CountRow>,
   );
   return Object.fromEntries(
     rows.map((r) => [r.category_id, { total: r.total_models, visible: r.visible_models }]),
   );
 }
 
-// Models from the catalogue_models view (no admin_notes). Retired ("hidden")
+// Models from catalogue_models() (no admin_notes). Retired ("hidden")
 // models are left out unless asked for, e.g. by the queue, which must still
 // show requests for them.
 export async function loadModels(
@@ -64,12 +73,12 @@ export async function loadModels(
 ) {
   return fetchAll<CatalogueModel>((from, to) => {
     let query = supabase
-      .from("catalogue_models")
+      .rpc("catalogue_models")
       .select(
         "id, code, code_key, name, category_id, default_scale, other_scales, availability, image_path, show_new_badge",
       );
     if (!includeHidden) query = query.neq("availability", "hidden");
-    return query.order("code").range(from, to).returns<CatalogueModel[]>();
+    return query.order("code").range(from, to) as unknown as Rows<CatalogueModel>;
   });
 }
 
@@ -100,7 +109,7 @@ export async function loadRequestLines(supabase: SupabaseClient) {
 }
 
 // Adds the "printing" amount to each line: the sum of quantity_planned on
-// its items in printing jobs. Read from the request_line_printing view, which
+// its items in printing jobs. Read from request_line_printing(), which
 // the requester may read too (it holds only line ids and numbers).
 export async function addPrinting(
   supabase: SupabaseClient,
@@ -109,11 +118,10 @@ export async function addPrinting(
   if (rows.length === 0) return [];
   const printing = await fetchAll<{ request_line_id: string; printing: number }>((from, to) =>
     supabase
-      .from("request_line_printing")
+      .rpc("request_line_printing")
       .select("request_line_id, printing")
       .order("request_line_id")
-      .range(from, to)
-      .returns<{ request_line_id: string; printing: number }[]>(),
+      .range(from, to) as unknown as Rows<{ request_line_id: string; printing: number }>,
   );
   const byLine = new Map(printing.map((p) => [p.request_line_id, p.printing]));
   return rows.map((row) => ({ ...row, printing: byLine.get(row.id) ?? 0 }));
@@ -124,11 +132,10 @@ export async function addPrinting(
 export async function loadPrintTotals(supabase: SupabaseClient) {
   const rows = await fetchAll<{ model_id: string; printed_total: number }>((from, to) =>
     supabase
-      .from("model_print_totals")
+      .rpc("model_print_totals")
       .select("model_id, printed_total")
       .order("model_id")
-      .range(from, to)
-      .returns<{ model_id: string; printed_total: number }[]>(),
+      .range(from, to) as unknown as Rows<{ model_id: string; printed_total: number }>,
   );
   return Object.fromEntries(rows.map((r) => [r.model_id, r.printed_total])) as Record<string, number>;
 }
@@ -225,12 +232,11 @@ export async function loadJobHistory(supabase: SupabaseClient) {
 export async function loadColourOptions(supabase: SupabaseClient) {
   return fetchAll<ColourOption>((from, to) =>
     supabase
-      .from("colour_options")
+      .rpc("colour_options")
       .select("id, name, colour, colour_hex, available, in_stock")
       .order("name")
       .order("id")
-      .range(from, to)
-      .returns<ColourOption[]>(),
+      .range(from, to) as unknown as Rows<ColourOption>,
   );
 }
 
@@ -292,13 +298,13 @@ export async function loadPrinterStats(supabase: SupabaseClient) {
 
 // The most printed models (successful prints in completed jobs).
 export async function loadTopModels(supabase: SupabaseClient, limit = 10): Promise<TopModel[]> {
-  const { data: totals, error } = await supabase
-    .from("model_print_totals")
+  const { data: totals, error } = await (supabase
+    .rpc("model_print_totals")
     .select("model_id, printed_total")
     .gt("printed_total", 0)
     .order("printed_total", { ascending: false })
-    .limit(limit)
-    .returns<{ model_id: string; printed_total: number }[]>();
+    .order("model_id")
+    .limit(limit) as unknown as Rows<{ model_id: string; printed_total: number }>);
   if (error) throw new Error(error.message);
   if (!totals?.length) return [];
   const { data: models, error: modelsError } = await supabase
