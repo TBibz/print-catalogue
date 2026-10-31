@@ -11,6 +11,7 @@ import {
 } from "@/components/request-fields";
 import type { JobFormOptions } from "@/lib/jobs";
 import { ColourLabel } from "@/components/colour-label";
+import { STICKY_HEADINGS } from "@/components/sticky-headings";
 import { StartPrintPanel, type PickableModel } from "./start-print-panel";
 
 export type QueueRow = {
@@ -132,7 +133,7 @@ export function QueueView({
       ) : (
         <div className="border-t border-neutral-200">
           <div
-            className={`hidden gap-3 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase lg:grid ${COLUMNS}`}
+            className={`${STICKY_HEADINGS} hidden gap-3 px-3 py-2 lg:grid ${COLUMNS}`}
           >
             {/* An empty cell over the tick boxes, so every heading sits over
                 its own column. (A visually hidden cell takes no space.) */}

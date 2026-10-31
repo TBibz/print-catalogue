@@ -167,7 +167,7 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 ## 6. Pages
 
-Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 96rem wide.
+Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 96rem wide. The header stays at the top but slides away while scrolling down and comes back on any scroll up; the catalogue and queue column headings (dark purple, bold white) stick under it, and the catalogue's category sidebar stays in view with its own scroll.
 
 **Colours are shown one way everywhere** (`components/colour-label.tsx`): a solid 6px vertical stripe of the material's `colour_hex`, full text height with slightly rounded corners, immediately left of the colour name in normal dark text. Very light colours (worked out from the hex's luminance) get a thin grey outline. "Any colour" has no stripe. In the catalogue's colour dropdown the chosen colour's stripe sits inside the box, left of the name.
 

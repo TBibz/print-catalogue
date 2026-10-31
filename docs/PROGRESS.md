@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (Note box always widest)_
+_Last updated: 2026-10-31 (sticky headings, auto-hiding nav)_
 
 ## Phases
 
@@ -85,6 +85,13 @@ _Last updated: 2026-10-31 (Note box always widest)_
 - Colour dropdown: the stripe covered the first letter because the box's own `px-2.5` padding won over the extra left padding (and some browsers ignore padding on a native-looking `<select>`). Size and colour dropdowns now draw their own arrow (`appearance-none`) and set left/right padding separately; with a stripe the text starts after it with a 6px gap, "Any colour" keeps the normal padding. Fixed in `components/request-fields.tsx`, so grid view is fixed too
 - Column widths (xl): Code 5rem, Size 5.5rem, Colour 12.5rem (fits "Sky Blue (out of stock)"), Qty 4rem, Urgency 7rem, Note takes the rest (about 15rem at 1280px, the widest). The status column is gone: "Saving…" / "Saved ✓" show inside the Note box, and errors / "N requested · M printing" / Remove on a line underneath
 - Checked with sample data in the browser pane at 1280px (list and grid view), using a temporary preview page that wasn't committed
+
+### Sticky headings and auto-hiding nav: Done
+- Site header (`components/auto-hide-header.tsx`): sticky, slides away while scrolling down, back on any small scroll up, always shown near the top; it slides with transform so the page never jumps. It sets `--nav-offset` (header height when showing, 0 when hidden)
+- Column headings on the catalogue list and the queue (`components/sticky-headings.ts`): dark purple (#3b2a5c), bold white, sticky at `top: var(--nav-offset)` so they sit right under the header and move with it. They are in the normal page flow, so they never cover the first row
+- Catalogue sidebar: sticky under the header with its own scroll when it's taller than the screen (the sidebar column now stretches to the list's height, which it needs for sticky to work)
+- Grid view gets the sidebar and the hiding header (no headings)
+- Checked with 58 sample models and 32 categories in the browser pane at 1280px (scroll down, small scroll up, headings line up), using a temporary preview page that wasn't committed. Queue headings use the same code but weren't separately checked
 
 ### Note box always the widest: Done
 - Closed colour box: the chosen colour is drawn over the native select (stripe + name); an out-of-stock colour shows as its name in grey italics with the tooltip "Out of stock" (the open list still says "(out of stock)"); very long names truncate with "…" and the full name in the tooltip

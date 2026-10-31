@@ -14,6 +14,7 @@ import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
 import { ANY_COLOUR, colourName, isLightColour, textColourOn, type ColourOption } from "@/lib/colours";
 import { ColourStripe } from "@/components/colour-label";
+import { STICKY_HEADINGS } from "@/components/sticky-headings";
 import type { CategoryCounts } from "@/lib/data";
 import {
   AddLineButton,
@@ -296,11 +297,13 @@ export function CatalogueView({
 
       {/* Categories: a sidebar on laptops, a dropdown on phones and tablets.
           Search always looks across every category. */}
-      <div className="lg:flex lg:items-start lg:gap-6">
+      {/* The sidebar column stretches to the list's full height, so the
+          category list inside it can stay stuck while the list scrolls. */}
+      <div className="lg:flex lg:gap-6">
         <aside className="hidden w-40 shrink-0 lg:block">
           <nav
             aria-label="Categories"
-            className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto border-r border-neutral-200 pr-3"
+            className="sticky top-[calc(var(--nav-offset)+0.5rem)] max-h-[calc(100vh-var(--nav-offset)-1rem)] overflow-y-auto border-r border-neutral-200 pr-3 transition-[top] duration-200 ease-out"
           >
             <ul className="space-y-0.5">
               <li>
@@ -380,9 +383,9 @@ export function CatalogueView({
         </ul>
       ) : (
         <div className="border-t border-neutral-200">
-          {/* Column headings (laptop/desktop only) */}
+          {/* Column headings (laptop/desktop only), sticky while scrolling */}
           <div
-            className={`hidden gap-x-3 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid ${
+            className={`${STICKY_HEADINGS} hidden gap-x-3 px-3 py-2 xl:grid ${
               OUTER[outerKey(showCategory, colourHeader)]
             }`}
           >

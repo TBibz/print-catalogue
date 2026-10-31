@@ -4,6 +4,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Height of the site header while it shows, 0 while it's hidden (set by
+     components/auto-hide-header.tsx). Sticky headings sit this far down. */
+  --nav-offset: 0px;
 }
 
 @theme inline {

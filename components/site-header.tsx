@@ -2,13 +2,15 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { signOut } from "@/app/actions/auth";
 import { AdminNav, NavLink } from "@/components/admin-menu";
+import { AutoHideHeader } from "@/components/auto-hide-header";
 import { getCurrentProfile } from "@/lib/auth";
 
 // App name (goes to the catalogue), Notepad, the admin links (admin only),
-// and Sign out on the right.
+// and Sign out on the right. It hides while scrolling down and comes back on
+// scrolling up (see AutoHideHeader).
 export function SiteHeader() {
   return (
-    <header className="border-b border-neutral-200">
+    <AutoHideHeader>
       <div className="mx-auto flex min-h-14 w-full max-w-[96rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 sm:px-6">
         <Link href="/catalogue" className="text-lg font-semibold">
           Print Catalogue
@@ -29,7 +31,7 @@ export function SiteHeader() {
           </button>
         </form>
       </div>
-    </header>
+    </AutoHideHeader>
   );
 }
 
