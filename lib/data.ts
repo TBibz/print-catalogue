@@ -12,6 +12,7 @@ import {
   type RequestLineRow,
 } from "@/lib/requests";
 import type { ColourOption } from "@/lib/colours";
+import type { MoneyMonth, MoneySettings, PrinterStats, TopModel } from "@/lib/money-data";
 import { DEFAULT_RESIN_DIVISOR, JOB_COLUMNS, type Job, type JobFormOptions } from "@/lib/jobs";
 import { MATERIAL_COLUMNS, PRINTER_COLUMNS, type Material, type Printer } from "@/lib/materials";
 
@@ -179,4 +180,65 @@ export async function loadUntickedNoteCount(supabase: SupabaseClient) {
     .neq("text", "");
   if (error) throw new Error(error.message);
   return count ?? 0;
+}
+
+// ---- Money page (admin only) ------------------------------------------------
+
+export async function loadMoneyMonths(supabase: SupabaseClient) {
+  const { data, error } = await supabase.rpc("money_by_month");
+  if (error) throw new Error(error.message);
+  // Amounts can arrive as text from numeric columns: make them numbers.
+  return ((data ?? []) as MoneyMonth[]).map((r) => ({
+    ...r,
+    charge: Number(r.charge),
+    job_costs: Number(r.job_costs),
+    payments: Number(r.payments),
+    costs: Number(r.costs),
+    difference: Number(r.difference),
+  }));
+}
+
+export async function loadMoneySettings(supabase: SupabaseClient): Promise<MoneySettings> {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("key, value")
+    .in("key", ["opening_balance", "money_start_month"])
+    .returns<{ key: string; value: string }[]>();
+  if (error) throw new Error(error.message);
+  const get = (key: string) => data?.find((s) => s.key === key)?.value ?? "";
+  return {
+    openingBalance: Number(get("opening_balance")) || 0,
+    startMonth: get("money_start_month"),
+  };
+}
+
+export async function loadPrinterStats(supabase: SupabaseClient) {
+  const { data, error } = await supabase.rpc("print_stats_by_printer");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as PrinterStats[]).map((r) => ({ ...r, charge: Number(r.charge) }));
+}
+
+// The most printed models (successful prints in completed jobs).
+export async function loadTopModels(supabase: SupabaseClient, limit = 10): Promise<TopModel[]> {
+  const { data: totals, error } = await supabase
+    .from("model_print_totals")
+    .select("model_id, printed_total")
+    .gt("printed_total", 0)
+    .order("printed_total", { ascending: false })
+    .limit(limit)
+    .returns<{ model_id: string; printed_total: number }[]>();
+  if (error) throw new Error(error.message);
+  if (!totals?.length) return [];
+  const { data: models, error: modelsError } = await supabase
+    .from("models")
+    .select("id, code, name")
+    .in("id", totals.map((t) => t.model_id))
+    .returns<{ id: string; code: string; name: string }[]>();
+  if (modelsError) throw new Error(modelsError.message);
+  const byId = new Map((models ?? []).map((m) => [m.id, m]));
+  return totals.map((t) => ({
+    code: byId.get(t.model_id)?.code ?? "?",
+    name: byId.get(t.model_id)?.name ?? "",
+    count: t.printed_total,
+  }));
 }

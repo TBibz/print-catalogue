@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/money";
 import { useState, useTransition } from "react";
 import {
   cancelPrintJob,
@@ -24,7 +25,6 @@ import {
   type JobItem,
   type JobFormOptions,
 } from "@/lib/jobs";
-import { formatGBP } from "@/lib/materials";
 
 // Which job has a form open, and which form.
 type Open = {
@@ -227,11 +227,11 @@ export function JobsView({
                       </span>
                       <span className="col-start-1 text-sm tabular-nums md:col-start-auto md:text-right">
                         <span className="md:hidden">My cost: </span>
-                        {formatGBP(job.my_cost)}
+                        {formatMoney(job.my_cost)}
                       </span>
                       <span className="col-start-1 text-sm font-medium tabular-nums md:col-start-auto md:text-right">
                         <span className="font-normal md:hidden">Charge: </span>
-                        {formatGBP(job.charge)}
+                        {formatMoney(job.charge)}
                       </span>
                       <button
                         type="button"
@@ -375,9 +375,9 @@ function JobSummary({ job, printerName, options }: { job: Job; printerName: stri
         ))}
       </ul>
       <p className="mt-2 text-sm">
-        My cost <strong className="tabular-nums">{formatGBP(job.my_cost)}</strong>
+        My cost <strong className="tabular-nums">{formatMoney(job.my_cost)}</strong>
         {job.my_cost_overridden && <span className="text-neutral-500"> (set by hand)</span>} · Charge{" "}
-        <strong className="tabular-nums">{formatGBP(job.charge)}</strong>
+        <strong className="tabular-nums">{formatMoney(job.charge)}</strong>
         {job.charge_overridden && <span className="text-neutral-500"> (set by hand)</span>}
       </p>
     </div>

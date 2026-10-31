@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 const ADMIN_LINKS = [
   { href: "/admin/queue", label: "Queue" },
   { href: "/admin/jobs", label: "Jobs" },
+  { href: "/admin/money", label: "Money" },
   { href: "/admin/models", label: "Models" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/upload", label: "Upload" },

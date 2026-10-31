@@ -4,11 +4,12 @@
 // model editor: main fields in the row's columns, Save where Edit was, the
 // rest in a panel underneath.
 
+import { formatMoney, formatMoneyInput, parseMoney } from "@/lib/money";
+import { MoneyInput } from "@/components/money-input";
 import { useEffect, useState, useTransition } from "react";
 import { deleteMaterial, saveMaterial, type MaterialInput } from "@/app/actions/materials";
 import {
   DEFAULT_CHARGE_MULTIPLIER,
-  formatGBP,
   per1000Label,
   TYPE_LABELS,
   unitFor,
@@ -36,8 +37,8 @@ function inputFrom(m: Material | null): MaterialInput {
     colour: m?.colour ?? "",
     colourHex: m?.colour_hex ?? DEFAULT_COLOUR_HEX,
     packSize: m ? num(m.pack_size) : "1000",
-    packCost: m ? Number(m.pack_cost).toFixed(2) : "",
-    chargePer1000: m ? (m.charge_per_unit * 1000).toFixed(2) : "",
+    packCost: m ? formatMoneyInput(m.pack_cost) : "",
+    chargePer1000: m ? formatMoneyInput(m.charge_per_unit * 1000) : "",
     chargeOverridden: m?.charge_overridden ?? false,
     inStock: m?.in_stock ?? true,
     offerAsColour: m?.offer_as_colour ?? false,
@@ -75,7 +76,7 @@ export function MaterialEditor({
   const unit = unitFor(values.type);
   // What the charge would be at 2 × cost, per kg / litre.
   const packSize = Number(values.packSize);
-  const packCost = Number(values.packCost);
+  const packCost = parseMoney(values.packCost) ?? NaN;
   const defaultCharge =
     packSize > 0 && packCost >= 0
       ? (DEFAULT_CHARGE_MULTIPLIER * packCost * 1000) / packSize
@@ -171,17 +172,12 @@ export function MaterialEditor({
             <label htmlFor="mat-pack-cost" className={fieldLabel}>
               Pack price (£)
             </label>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm text-neutral-600">£</span>
-              <input
-                id="mat-pack-cost"
-                inputMode="decimal"
-                value={values.packCost}
-                onChange={(e) => set("packCost", e.target.value.replace(/[^0-9.]/g, ""))}
-                placeholder="0.00"
-                className={`${box} text-sm`}
-              />
-            </div>
+            <MoneyInput
+              id="mat-pack-cost"
+              value={values.packCost}
+              onChange={(v) => set("packCost", v)}
+              className="w-full"
+            />
             {fieldError("packCost")}
           </div>
           <div>
@@ -191,16 +187,12 @@ export function MaterialEditor({
                 <label htmlFor="mat-charge" className="sr-only">
                   Charge {per1000Label(unit)} (£)
                 </label>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-neutral-600">£</span>
-                  <input
-                    id="mat-charge"
-                    inputMode="decimal"
-                    value={values.chargePer1000}
-                    onChange={(e) => set("chargePer1000", e.target.value.replace(/[^0-9.]/g, ""))}
-                    className={`${box} text-sm`}
-                  />
-                </div>
+                <MoneyInput
+                  id="mat-charge"
+                  value={values.chargePer1000}
+                  onChange={(v) => set("chargePer1000", v)}
+                  className="w-full"
+                />
                 <button
                   type="button"
                   onClick={() => set("chargeOverridden", false)}
@@ -212,14 +204,14 @@ export function MaterialEditor({
             ) : (
               <>
                 <p className="py-2 text-sm">
-                  {defaultCharge === null ? "—" : formatGBP(defaultCharge)}{" "}
+                  {defaultCharge === null ? "—" : formatMoney(defaultCharge)}{" "}
                   <span className="text-xs text-neutral-500">({DEFAULT_CHARGE_MULTIPLIER} × cost)</span>
                 </p>
                 <button
                   type="button"
                   onClick={() => {
                     set("chargeOverridden", true);
-                    if (defaultCharge !== null) set("chargePer1000", defaultCharge.toFixed(2));
+                    if (defaultCharge !== null) set("chargePer1000", formatMoneyInput(defaultCharge));
                   }}
                   className="text-xs text-neutral-600 underline hover:no-underline"
                 >

@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (catalogue colour box padding and column widths)_
+_Last updated: 2026-10-31 (Phase 7: money and stats)_
 
 ## Phases
 
@@ -16,8 +16,8 @@ _Last updated: 2026-10-31 (catalogue colour box padding and column widths)_
 | 5 | Materials and printers | Done |
 | 6a | Print jobs | Done (needs `0008` run, then testing) |
 | 6b | Colours, categories page, notepad count | Done (needs `0010` run, then testing) |
-| 7 | Money and stats | **Not started (next)** |
-| 8 | Polish | Not started |
+| 7 | Money and stats | Done (needs `0012` run, then testing) |
+| 8 | Polish | **Not started (next)** |
 
 ### 1. Foundations: Done
 - Next.js 16 app, Supabase email/password login, sign out, proxy guarding every page except `/login`
@@ -86,7 +86,11 @@ _Last updated: 2026-10-31 (catalogue colour box padding and column widths)_
 - Column widths (xl): Code 5rem, Size 5.5rem, Colour 12.5rem (fits "Sky Blue (out of stock)"), Qty 4rem, Urgency 7rem, Note takes the rest (about 15rem at 1280px, the widest). The status column is gone: "Saving…" / "Saved ✓" show inside the Note box, and errors / "N requested · M printing" / Remove on a line underneath
 - Checked with sample data in the browser pane at 1280px (list and grid view), using a temporary preview page that wasn't committed
 
-### 7. Money and stats: Not started
+### 7. Money and stats: Done (not yet tested against the real database)
+- `0012_money.sql`: `monthly_money` (admin only), settings `opening_balance` and `money_start_month` (defaults to the first completed job's month), `money_by_month()` (Europe/London months, every job, newest first) and `print_stats_by_printer()`. Checked in PGlite: a job finished at 23:30 UTC on 30 June counts in July, cancelled jobs don't count, Dad gets no rows, half-month dates are refused, safe to run twice
+- `/admin/money` ("Money" in the header): running total, Starting balance (opening balance + first month), table newest first with autosaving Payments and Costs, "Materials from jobs" reference, coloured differences, all-time stats per printer and top 10 models
+- Money formatting everywhere (`lib/money.ts`): "£1,234.56", "−£12.34"; £ boxes (`components/money-input.tsx`) with a fixed £ that accept "12", "12.5", "1,200". Used on Money, Jobs, the Start print panel (est. cost, my cost, charge) and Materials (pack price, charge)
+- The page layout was checked with sample data in the browser pane (desktop and phone), using a temporary preview page that wasn't committed
 ### 8. Polish: Not started
 
 ## Migrations
@@ -106,6 +110,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0009_delete_print_job.sql` | 6a | `delete_print_job` (reverts a completed job first) | ☐ |
 | `0010_colours.sql` | 6b | colours on request lines and job items, `colour_options` view, colour checks, BASES colours | ☐ |
 | `0011_colour_hex_category_order.sql` | 6b | `materials.colour_hex`, `colour_options` with hex and out-of-stock colours, category positions, `reorder_categories()` | ☐ |
+| `0012_money.sql` | 7 | `monthly_money`, money settings, `money_by_month()`, `print_stats_by_printer()` | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -134,6 +139,8 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - The "can't go below printing" rule applies to the admin too, not just the requester, and also blocks deleting a printing line or changing its size. Cancel the job first if a request really has to shrink.
 - `my_cost` has its own `my_cost_overridden` flag (not in the original brief), so a hand-typed cost isn't recalculated over.
 - A partly successful job is charged in full; jobs where nothing succeeded, and cancelled jobs, are charged 0 unless set by hand.
+- Money: payments and costs are typed per month (not per purchase or payment). The running total only counts months from the start month; anything before goes in the opening balance.
+- The month list is generated from the start month to this month, so a month with nothing typed still shows (as £0).
 - Job RPCs are `security definer` with an admin check at the top; helper functions are not callable by the app.
 - Colours are set per category (has_colour_options), not per model. The list of colours is every filament with "Offer as colour" ticked (out-of-stock ones greyed out).
 - `materials.colour_hex` is the only source of a material's displayed colour.

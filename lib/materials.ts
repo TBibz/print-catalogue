@@ -50,9 +50,6 @@ export const MATERIAL_COLUMNS =
 // The charge a material gets unless it's set by hand (see 0006 migration).
 export const DEFAULT_CHARGE_MULTIPLIER = 2;
 
-export function formatGBP(value: number) {
-  return `£${Number(value).toFixed(2)}`;
-}
 
 // The settings the app knows about, with how to show them.
 export const SETTINGS = [

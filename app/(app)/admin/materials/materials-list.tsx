@@ -1,10 +1,10 @@
 "use client";
 
+import { formatMoney } from "@/lib/money";
 import { useCallback, useRef, useState } from "react";
 import { setMaterialInStock } from "@/app/actions/materials";
 import { naturalCollator } from "@/lib/catalogue";
 import {
-  formatGBP,
   per1000Label,
   TYPE_LABELS,
   type Material,
@@ -187,21 +187,21 @@ export function MaterialsList({ materials: serverMaterials }: { materials: Mater
                     <ColourLabel hex={m.colour_hex} name={m.colour || m.name} />
                   </span>
                   <span className="block text-xs text-neutral-500 md:hidden">
-                    {TYPE_LABELS[m.type]} · {formatGBP(m.pack_cost)} for {Number(m.pack_size)}
-                    {m.unit} · charge {formatGBP(m.charge_per_unit * 1000)} {per1000Label(m.unit)}
+                    {TYPE_LABELS[m.type]} · {formatMoney(m.pack_cost)} for {Number(m.pack_size)}
+                    {m.unit} · charge {formatMoney(m.charge_per_unit * 1000)} {per1000Label(m.unit)}
                   </span>
                 </span>
                 <span className="hidden text-sm md:block">{TYPE_LABELS[m.type]}</span>
                 <span className="hidden text-sm md:block">
-                  {formatGBP(m.pack_cost)} / {Number(m.pack_size)}
+                  {formatMoney(m.pack_cost)} / {Number(m.pack_size)}
                   {m.unit}
                 </span>
                 <span className="hidden text-sm md:block">
-                  {formatGBP(m.cost_per_unit * 1000)}
+                  {formatMoney(m.cost_per_unit * 1000)}
                   <span className="block text-xs text-neutral-500">{per1000Label(m.unit)}</span>
                 </span>
                 <span className="hidden text-sm md:block">
-                  {formatGBP(m.charge_per_unit * 1000)}
+                  {formatMoney(m.charge_per_unit * 1000)}
                   <span className="block text-xs text-neutral-500">
                     {per1000Label(m.unit)}
                     {m.charge_overridden ? " · set by hand" : ""}

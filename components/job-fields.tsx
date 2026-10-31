@@ -3,8 +3,10 @@
 // The print job details form, used by "Start print" on the queue and by
 // "Edit details" on the jobs page. Choose the printer first; then only the
 // fields for that printer type are shown (brief section 4).
+import { formatMoney, formatMoneyInput } from "@/lib/money";
+import { MoneyInput } from "@/components/money-input";
 import { calculateMoney, type JobForm, type JobFormOptions } from "@/lib/jobs";
-import { formatGBP, TYPE_LABELS } from "@/lib/materials";
+import { TYPE_LABELS } from "@/lib/materials";
 
 const box =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
@@ -108,8 +110,13 @@ export function JobFields({
               </div>
             </Field>
             {type === "resin" && (
-              <Field label="Est. cost (£, from slicer)" htmlFor={id("estcost")} required>
-                <NumberBox id={id("estcost")} value={form.estCost} onChange={(v) => onChange({ estCost: v })} />
+              <Field label="Est. cost (from slicer)" htmlFor={id("estcost")} required>
+                <MoneyInput
+                  id={id("estcost")}
+                  value={form.estCost}
+                  onChange={(v) => onChange({ estCost: v })}
+                  className="w-full"
+                />
               </Field>
             )}
             {type === "resin" && (
@@ -175,7 +182,7 @@ export function JobFields({
                 type === "resin"
                   ? "The slicer's estimated cost."
                   : material
-                    ? `${form.estWeightG || 0} g × ${formatGBP(Number(material.cost_per_unit) * 1000)} per kg`
+                    ? `${form.estWeightG || 0} g × ${formatMoney(Number(material.cost_per_unit) * 1000)} per kg`
                     : "Choose the filament to work this out."
               }
             />
@@ -193,7 +200,7 @@ export function JobFields({
                   : type === "resin"
                     ? `${form.estWeightG || 0} g ÷ ${options.divisor}`
                     : material
-                      ? `${form.estWeightG || 0} g × ${formatGBP(Number(material.charge_per_unit) * 1000)} per kg`
+                      ? `${form.estWeightG || 0} g × ${formatMoney(Number(material.charge_per_unit) * 1000)} per kg`
                       : "Choose the filament to work this out."
               }
             />
@@ -284,24 +291,19 @@ function MoneyField({
       <label htmlFor={id} className="mb-1 block text-sm font-medium">
         {label}
       </label>
-      <div className="flex items-center gap-2">
-        <span className="text-neutral-500">£</span>
-        <input
+      <div className="flex flex-wrap items-center gap-2">
+        <MoneyInput
           id={id}
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          value={overridden ? value : calculated.toFixed(2)}
-          onChange={(e) => {
-            const v = e.target.value.replace(/[^0-9.]/g, "");
-            if ((v.match(/\./g) ?? []).length > 1) return;
-            onType(v);
+          value={overridden ? value : formatMoneyInput(calculated)}
+          // Only a real change sets it by hand (leaving the box re-tidies
+          // the number, which isn't a change).
+          onChange={(v) => {
+            if (overridden || v !== formatMoneyInput(calculated)) onType(v);
           }}
-          className={`${box} w-32 tabular-nums`}
         />
         {overridden ? (
           <button type="button" onClick={onReset} className="text-sm text-neutral-600 underline hover:no-underline">
-            Use calculated ({formatGBP(calculated)})
+            Use calculated ({formatMoney(calculated)})
           </button>
         ) : (
           <span className="text-xs text-neutral-500">calculated</span>

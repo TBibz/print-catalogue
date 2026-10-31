@@ -22,6 +22,7 @@ Only these two users. No public sign-up.
 - Database changes go in numbered SQL files in `supabase/migrations/` (e.g. `0001_init.sql`). Tomi runs them by hand in the Supabase SQL Editor, so each file must be safe to read and run top to bottom.
 - Multi-step data changes that must happen together (e.g. completing a print job) are Postgres functions called via RPC, not several separate client calls.
 - UK English in the UI. Currency is GBP (£).
+- Money everywhere is shown as "£1,234.56" (two decimals, thousands separators) and negatives as "−£12.34" (`formatMoney` in `lib/money.ts`). Money boxes have a fixed "£" inside on the left; only the number is typed, and "12", "12.5" and "1,200" are all accepted (`components/money-input.tsx`). Amounts are stored pence-accurate (`numeric(…, 2)`).
 - **Desktop/laptop first**, but layouts must still work on a phone.
 - Clean, minimal look: white/light background (model renders are on pure white), clear typography, no clutter. Large enough click targets for an older user.
 - Tomi is a beginner coder. Keep code readable, add short comments on non-obvious logic, and always finish a task with a plain-English checklist of anything Tomi must do by hand.
@@ -103,11 +104,23 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 - `id`, `text`, `created_by`, `created_at`, `done` (bool), `done_at`, `position`
 
 ### settings (Phase 5)
-- Key/value. `resin_charge_divisor` = 15.
+- Key/value. `resin_charge_divisor` = 15; `opening_balance` (£, can be negative); `money_start_month` (first day of the first month on the Money page; defaults to the month of the first completed job).
 
-### purchases and payments (Phase 7)
-- `purchases`: date, description, amount (material/equipment costs; replaces the "Invoices" tab)
-- `payments`: date, amount, type, note (money received from Dad)
+### monthly_money (Phase 7)
+One row per month, only once something has been typed in (a month without a row counts as £0).
+- `month` (date, primary key: the first day of the month), `payments` (£ received from Dad, default 0), `costs` (£ spent, default 0), `note` (optional), `updated_at`
+- Admin only (RLS).
+
+### Money by month (Phase 7)
+`money_by_month()` returns one row per month from `money_start_month` to the current month (newest first), using Europe/London month boundaries and every job in the database:
+- `plates` = completed print jobs (by `completed_at`), `items` = sum of their `quantity_succeeded`
+- `charge` = sum of their `charge`, `job_costs` = sum of their `my_cost` (reference only)
+- `payments`, `costs` from `monthly_money` (0 if no row)
+- `difference` = payments − (charge + costs)
+
+The running total = `opening_balance` + the sum of every month's difference. Months are generated, never created by hand, so a new month appears by itself when it starts.
+
+`print_stats_by_printer()` returns all-time completed plates, items and charge per printer.
 
 ## 5. Core rules
 
@@ -171,7 +184,7 @@ Admin only:
 - `/admin/categories`: each category with its model count; drag-and-drop order (⠿ handle, plus ↑ ↓ buttons), saved immediately; rename, colour options, add; delete only when it has no models.
 - `/admin/materials`: each material shows its colour stripe; adding or editing uses a native colour picker for `colour_hex`.
 - `/admin/materials`, `/admin/printers`
-- `/admin/money`: month-by-month costs (purchases), charges for prints, payments received, difference; plus print stats.
+- `/admin/money` ("Money" in the header): the running total at the top, large, red if negative, green if positive, grey at zero. A "Starting balance" section (opening balance and first month shown, saved to settings). A table, newest month first: Month ("Oct 2026"), Print jobs ("12 plates · 47 items"), Charge, Payments, Costs, Difference. Payments and Costs are £ boxes that autosave ("Saved ✓"), with "Materials from jobs: £x.xx" in grey under Costs. Difference is coloured like the total. Below: all-time stats (plates and items per printer, total charge, top 10 most printed models).
 - `/admin/settings`
 
 ## 7. Phases
@@ -184,7 +197,7 @@ Admin only:
 6. **Print jobs**, in two parts:
    - **6a:** start print from the queue with the printer-specific form, complete/partial/cancel/edit/revert, costs and charges, printing status on the catalogue, printed totals, NEW badge auto-off.
    - **6b:** colour choice for categories with colour options such as BASES (`colour_material_id` on request lines and job items), `/admin/categories` page, unticked notepad count on the queue.
-7. **Money and stats:** purchases, payments, monthly cost vs revenue, print stats.
+7. **Money and stats:** monthly payments and costs, charges from completed jobs, difference and running total with an opening balance, print stats.
 8. **Polish:** installable home-screen app, custom domain, small UX fixes.
 
 ## 8. Catalogue import (Phase 1)

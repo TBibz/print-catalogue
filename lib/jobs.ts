@@ -1,6 +1,7 @@
 // Types and rules for print jobs (admin only), shared by the queue's
 // "Start print" panel and the jobs page.
 import type { Material, MaterialType, Printer } from "@/lib/materials";
+import { formatMoneyInput, parseMoney } from "@/lib/money";
 
 export type JobStatus = "printing" | "completed" | "cancelled";
 
@@ -104,14 +105,21 @@ export function jobFormFrom(job: Job): JobForm {
     estWeightG: text(job.est_weight_g),
     printHours: text(job.print_hours),
     printMinutes: text(job.print_minutes),
-    estCost: text(job.est_cost),
+    estCost: job.est_cost === null ? "" : formatMoneyInput(job.est_cost),
     layerHeightMm: text(job.layer_height_mm) || DEFAULT_LAYER_HEIGHT,
     materialId: job.material_id ?? "",
-    myCost: Number(job.my_cost).toFixed(2),
+    myCost: formatMoneyInput(job.my_cost),
     myCostOverridden: job.my_cost_overridden,
-    charge: Number(job.charge).toFixed(2),
+    charge: formatMoneyInput(job.charge),
     chargeOverridden: job.charge_overridden,
   };
+}
+
+// A £ box's text as the database expects it ("1,200.00" → "1200"); left as
+// typed if it isn't a valid amount, so the database's own message shows.
+function moneyForDb(text: string) {
+  const n = parseMoney(text);
+  return n === null || Number.isNaN(n) ? text : String(n);
 }
 
 // What gets sent to the database functions as "details".
@@ -123,12 +131,12 @@ export function detailsFrom(form: JobForm) {
     est_weight_g: form.estWeightG,
     print_hours: form.printHours,
     print_minutes: form.printMinutes,
-    est_cost: form.estCost,
+    est_cost: moneyForDb(form.estCost),
     layer_height_mm: form.layerHeightMm,
     material_id: form.materialId,
-    my_cost: form.myCost,
+    my_cost: moneyForDb(form.myCost),
     my_cost_overridden: form.myCostOverridden,
-    charge: form.charge,
+    charge: moneyForDb(form.charge),
     charge_overridden: form.chargeOverridden,
   };
 }
@@ -150,7 +158,7 @@ export function calculateMoney(
   let myCost = 0;
   let charge = 0;
   if (printerType === "resin") {
-    myCost = Number(form.estCost) || 0;
+    myCost = parseMoney(form.estCost) || 0;
     charge = divisor > 0 ? weight / divisor : 0;
   } else if (printerType === "fdm" && material) {
     myCost = weight * Number(material.cost_per_unit);

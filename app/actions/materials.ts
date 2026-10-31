@@ -13,6 +13,7 @@ import {
   type MaterialType,
   type Printer,
 } from "@/lib/materials";
+import { parseMoney } from "@/lib/money";
 
 type Fail = { ok: false; error: string; field?: string };
 const TYPES: MaterialType[] = ["resin", "fdm"];
@@ -87,8 +88,9 @@ export async function saveMaterial(
   const colour = String(input.colour ?? "").trim();
   const colourHex = String(input.colourHex ?? "").trim().toLowerCase();
   const packSize = Number(input.packSize);
-  const packCost = Number(input.packCost);
-  const charge = Number(input.chargePer1000);
+  // Typed in £ boxes, so they may have separators ("1,200.00").
+  const packCost = parseMoney(input.packCost) ?? NaN;
+  const charge = parseMoney(input.chargePer1000) ?? NaN;
 
   if (!TYPES.includes(input.type)) return { ok: false, field: "type", error: "Please choose a type." };
   if (!name) return { ok: false, field: "name", error: "Please enter a name." };
@@ -100,10 +102,10 @@ export async function saveMaterial(
   if (!(packSize > 0) || packSize > 100000) {
     return { ok: false, field: "packSize", error: "Enter the pack size, e.g. 1000." };
   }
-  if (!(packCost >= 0) || packCost > 100000 || String(input.packCost).trim() === "") {
+  if (!(packCost >= 0) || packCost > 100000) {
     return { ok: false, field: "packCost", error: "Enter the pack price in £, e.g. 12.49." };
   }
-  if (input.chargeOverridden && (!(charge >= 0) || charge > 100000 || String(input.chargePer1000).trim() === "")) {
+  if (input.chargeOverridden && (!(charge >= 0) || charge > 100000)) {
     return { ok: false, field: "chargePer1000", error: "Enter the charge in £, e.g. 24.98." };
   }
 
