@@ -196,6 +196,12 @@ export function CatalogueView({
 
   const shownTab = searching ? ALL : activeTab;
 
+  // Choosing a category clears the search (search covers every category).
+  const chooseCategory = (id: string) => {
+    setActiveTab(id);
+    setQuery("");
+  };
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -236,29 +242,56 @@ export function CatalogueView({
         </div>
       </div>
 
-      <div role="tablist" aria-label="Categories" className="mb-4 flex flex-wrap gap-2">
-        <TabButton
-          label="All"
-          count={rows.length}
-          selected={shownTab === ALL}
-          onClick={() => {
-            setActiveTab(ALL);
-            setQuery("");
-          }}
-        />
-        {tabs.map((c) => (
-          <TabButton
-            key={c.id}
-            label={c.name}
-            count={counts.get(c.id) ?? 0}
-            selected={shownTab === c.id}
-            onClick={() => {
-              setActiveTab(c.id);
-              setQuery("");
-            }}
-          />
-        ))}
-      </div>
+      {/* Categories: a sidebar on laptops, a dropdown on phones and tablets.
+          Search always looks across every category. */}
+      <div className="lg:flex lg:items-start lg:gap-6">
+        <aside className="hidden w-48 shrink-0 lg:block">
+          <nav
+            aria-label="Categories"
+            className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto border-r border-neutral-200 pr-3"
+          >
+            <ul className="space-y-0.5">
+              <li>
+                <CategoryButton
+                  label="All"
+                  count={rows.length}
+                  selected={shownTab === ALL}
+                  onClick={() => chooseCategory(ALL)}
+                />
+              </li>
+              {tabs.map((c) => (
+                <li key={c.id}>
+                  <CategoryButton
+                    label={c.name}
+                    count={counts.get(c.id) ?? 0}
+                    selected={shownTab === c.id}
+                    onClick={() => chooseCategory(c.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-4 lg:hidden">
+            <label htmlFor="catalogue-category" className="mb-1 block text-sm text-neutral-600">
+              Category
+            </label>
+            <select
+              id="catalogue-category"
+              value={shownTab}
+              onChange={(e) => chooseCategory(e.target.value)}
+              className="h-11 w-full max-w-md cursor-pointer rounded-md border border-neutral-300 bg-white px-3 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+            >
+              <option value={ALL}>All ({rows.length})</option>
+              {tabs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({counts.get(c.id) ?? 0})
+                </option>
+              ))}
+            </select>
+          </div>
 
       <p className="mb-2 text-sm text-neutral-500" aria-live="polite">
         {visible.length} {visible.length === 1 ? "model" : "models"}
@@ -275,7 +308,7 @@ export function CatalogueView({
             : `Nothing matches “${query}”.`}
         </p>
       ) : view === "grid" ? (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((r) => (
             <ModelCard
               key={r.id}
@@ -292,7 +325,7 @@ export function CatalogueView({
       ) : (
         <div className="border-t border-neutral-200">
           {/* Column headings (laptop/desktop only) */}
-          <div className="hidden grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase lg:grid">
+          <div className="hidden grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid">
             <span>Code</span>
             <span>Name</span>
             <span className="grid grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem] gap-2">
@@ -319,13 +352,15 @@ export function CatalogueView({
           </ul>
         </div>
       )}
+        </div>
+      </div>
 
       {enlarged && <ImagePopout model={enlarged} onClose={closeImage} />}
     </div>
   );
 }
 
-function TabButton({
+function CategoryButton({
   label,
   count,
   selected,
@@ -339,16 +374,14 @@ function TabButton({
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={selected}
+      aria-current={selected ? "true" : undefined}
       onClick={onClick}
-      className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-        selected
-          ? "border-neutral-900 bg-neutral-900 text-white"
-          : "border-neutral-300 text-neutral-700 hover:border-neutral-500 hover:text-neutral-900"
+      className={`flex w-full items-baseline justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+        selected ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
       }`}
     >
-      {label} <span className={selected ? "text-neutral-300" : "text-neutral-400"}>{count}</span>
+      <span className="min-w-0 break-words">{label}</span>
+      <span className={`tabular-nums ${selected ? "text-neutral-300" : "text-neutral-400"}`}>{count}</span>
     </button>
   );
 }
@@ -399,7 +432,7 @@ const ModelRow = memo(function ModelRow({
     : {};
 
   return (
-    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 lg:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] lg:items-start lg:gap-4 lg:py-3">
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 xl:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] xl:items-start xl:gap-4 xl:py-3">
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
         className={`pt-2 font-mono text-sm ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
@@ -410,7 +443,7 @@ const ModelRow = memo(function ModelRow({
 
       {/* Hover: preview to the right of the pointer. Click: enlarge. */}
       <div
-        className={`min-w-0 lg:pt-2 ${url ? "cursor-zoom-in" : ""}`}
+        className={`min-w-0 xl:pt-2 ${url ? "cursor-zoom-in" : ""}`}
         {...imageHandlers}
         {...(url && {
           role: "button",
@@ -428,8 +461,8 @@ const ModelRow = memo(function ModelRow({
       </div>
       {pointer && url && <HoverPreview url={url} pointer={pointer} />}
 
-      {/* On phones and tablets the controls sit under the name. */}
-      <div className="col-span-2 lg:col-span-1">
+      {/* Below xl (phones, tablets, small laptops) the controls sit under the name. */}
+      <div className="col-span-2 xl:col-span-1">
         <RequestSlots model={model} slots={slots} version={version} compact={false} {...callbacks} />
       </div>
     </li>
@@ -615,13 +648,13 @@ function LineEditor({
   const what = `${model.code} ${model.name}`;
   // Keep a saved size selectable even if it's no longer in the model's list.
   const sizeOptions = options.includes(fields.scale) ? options : [...options, fields.scale];
-  // On wide screens the list view puts everything on one line.
-  const wide = compact ? "" : "lg:col-span-1";
+  // On wide screens (xl) the list view puts everything on one line.
+  const wide = compact ? "" : "xl:col-span-1";
 
   return (
     <div
       className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 ${
-        compact ? "" : "lg:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]"
+        compact ? "" : "xl:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]"
       }`}
     >
       <div className={`col-span-3 text-sm text-neutral-600 ${wide}`}>
@@ -635,8 +668,8 @@ function LineEditor({
             onChange={(v) => update("scale", v, "now")}
           />
         ) : (
-          <span className={compact ? "" : "lg:pl-1"}>
-            <span className={`text-neutral-400 ${compact ? "" : "lg:hidden"}`}>Size: </span>
+          <span className={compact ? "" : "xl:pl-1"}>
+            <span className={`text-neutral-400 ${compact ? "" : "xl:hidden"}`}>Size: </span>
             {scaleLabel(fields.scale, model.default_scale)}
           </span>
         )}

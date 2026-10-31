@@ -158,7 +158,9 @@ export function calculateMoney(
   return { myCost: round2(myCost), charge: noCharge ? 0 : round2(charge) };
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+// Rounds to pence like the database does (half up). EPSILON stops values
+// such as 1.005 (stored as 1.00499999…) rounding down.
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // ---- Display helpers ----------------------------------------------------------
 

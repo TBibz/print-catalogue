@@ -64,6 +64,12 @@ export async function cancelPrintJob(jobId: string): Promise<JobResult> {
   return callRpc("cancel_print_job", { p_job_id: jobId });
 }
 
+// Deletes a job for good. A completed job is reverted first (see
+// 0009_delete_print_job.sql), so requests get back what it took off them.
+export async function deletePrintJob(jobId: string): Promise<JobResult> {
+  return callRpc("delete_print_job", { p_job_id: jobId });
+}
+
 export async function updatePrintJobDetails(jobId: string, form: JobForm): Promise<JobResult> {
   if (!form.printerId) return { ok: false, error: "Please choose a printer." };
   return callRpc("update_print_job_details", {

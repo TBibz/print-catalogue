@@ -135,7 +135,7 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 - Adjusting `quantity_succeeded` re-applies only the difference: fewer succeeded puts the extra back (recreating the request line if needed, with the same model, size, urgency and note, or adding to an existing line for that model and size); more succeeded takes more off the line if it still wants some (never below what other jobs are printing).
 - Reverting a completed job puts back `quantity_applied_to_request` and sets the job back to `printing`. Cancelled jobs can't be reverted (start a new plate instead).
 
-**RPC functions** (`0008_print_jobs.sql`, admin only, one transaction each): `start_print_job`, `complete_print_job`, `update_completed_result`, `revert_print_job`, `cancel_print_job`, `update_print_job_details`. They raise plain-English messages that the app shows as they are.
+**RPC functions** (`0008_print_jobs.sql`, admin only, one transaction each): `start_print_job`, `complete_print_job`, `update_completed_result`, `revert_print_job`, `cancel_print_job`, `update_print_job_details`, and `delete_print_job` (`0009_delete_print_job.sql`: a completed job is reverted first, then the job and its items are deleted; a printing or cancelled job is just deleted). They raise plain-English messages that the app shows as they are.
 
 **Cancelling a printing job:** nothing is counted.
 
@@ -150,14 +150,18 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 
 ## 6. Pages
 
+Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Models, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 80rem (`max-w-7xl`) wide.
+
+Request controls (quantity, urgency, note, size) are all the same height (44px) wherever they appear.
+
 Everyone:
 - `/login`
-- `/catalogue`: category tabs (All + each category), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing".
-- `/notepad`: handwritten-style font, bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
+- `/catalogue`: categories in a left-hand sidebar (All + each category, with model counts; a category dropdown above the list below 1024px wide), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing". From 1280px wide each list row is on one line; narrower, the controls sit under the name.
+- `/notepad`: handwritten-style font sitting straight on the plain white page (no card, paper or ruled lines), bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
 
 Admin only:
 - `/admin/queue`: all request lines sorted by the queue rule, with "N requested · M printing". Tick lines, set how many go on this plate (default = what's left to print), add catalogue models (search) or free-text items, choose printer, see my cost and charge live, "Start print". Shows the unticked notepad count (Phase 6b).
-- `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item and All succeeded / All failed shortcuts, Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert.
+- `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item and All succeeded / All failed shortcuts, Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert. Any job (printing, completed or cancelled) can be deleted for good, after an in-page confirmation.
 - `/admin/models` also shows each model's printed total.
 - `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it.
 - `/admin/upload`: bulk image upload; match file name to `code_key`, create new models for unknown codes (choose a category for the batch), ask before replacing an existing image.

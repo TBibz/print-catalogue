@@ -1,26 +1,20 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { signOut } from "@/app/actions/auth";
-import { AdminMenu } from "@/components/admin-menu";
+import { AdminNav, NavLink } from "@/components/admin-menu";
 import { getCurrentProfile } from "@/lib/auth";
 
-const navLink =
-  "rounded-md px-2 py-1.5 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900";
-
+// App name (goes to the catalogue), Notepad, the admin links (admin only),
+// and Sign out on the right.
 export function SiteHeader() {
   return (
     <header className="border-b border-neutral-200">
-      <div className="mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 sm:px-6">
+      <div className="mx-auto flex min-h-14 w-full max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 sm:px-6">
         <Link href="/catalogue" className="text-lg font-semibold">
           Print Catalogue
         </Link>
-        <nav className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm sm:gap-x-4">
-          <Link href="/catalogue" className={navLink}>
-            Catalogue
-          </Link>
-          <Link href="/notepad" className={navLink}>
-            Notepad
-          </Link>
+        <nav className="flex flex-1 flex-wrap items-center gap-x-1 gap-y-1 text-sm">
+          <NavLink href="/notepad">Notepad</NavLink>
           {/* Checking the role needs the login cookie, so it streams in. */}
           <Suspense fallback={null}>
             <AdminLinks />
@@ -43,15 +37,5 @@ export function SiteHeader() {
 async function AdminLinks() {
   const profile = await getCurrentProfile();
   if (profile?.role !== "admin") return null;
-  return (
-    <>
-      <Link href="/admin/queue" className={navLink}>
-        Queue
-      </Link>
-      <Link href="/admin/jobs" className={navLink}>
-        Jobs
-      </Link>
-      <AdminMenu className={navLink} />
-    </>
-  );
+  return <AdminNav />;
 }

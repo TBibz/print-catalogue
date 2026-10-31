@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (Phase 6a: print jobs)_
+_Last updated: 2026-10-31 (UI fixes and deleting print jobs)_
 
 ## Phases
 
@@ -55,6 +55,14 @@ _Last updated: 2026-10-31 (Phase 6a: print jobs)_
 - Catalogue: "N requested · M printing", NEW badge hides at 4 printed, clear message when trying to go below what's printing
 - `/admin/models`: "Printed N" per model, "NEW ended" when the badge has turned itself off
 
+### UI fixes before 6b: Done (needs `0009` run)
+- Notepad: no yellow card or ruled lines, just the handwriting on white
+- Jobs: Delete on any job, with an in-page confirmation. `0009_delete_print_job.sql` reverts a completed job first, then deletes it and its items
+- Charges checked against the brief: resin = weight ÷ divisor (45 g ÷ 15 = £3.00), FDM = weight × the material's charge per g (100 g PLA Black at the seeded £12.49/kg: charge £2.50, my cost £1.25). Both forms recalculate as you type; the live preview now rounds like the database
+- Quantity, urgency, note and size controls are all 44px high (catalogue and queue, plus the queue's Plate box)
+- Catalogue: category sidebar on laptops, category dropdown on phones and tablets; one-line rows from 1280px wide
+- Header: app name links to the catalogue (Catalogue button removed), Notepad, then admin links in a row (Admin drop-down below 1280px), current page highlighted; pages widened to 80rem
+
 ### 6b. BASES colours, categories page, notepad count: Not started
 - `colour_material_id` on `request_lines` and `print_job_items`; widen the request line unique rule to (model, scale, colour); add the colour to the line matching in `pj_put_back` (marked "Phase 6b" in `0008_print_jobs.sql`)
 - A view exposing just the colour names (materials with `offer_as_colour`) to the requester
@@ -79,6 +87,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0006_materials_printers.sql` | 5 | printers, materials, settings (admin-only) | ☐ |
 | `0007_seed_materials.sql` | 5 | seeds 9 PLA filaments and 3 resins | ☐ |
 | `0008_print_jobs.sql` | 6a | print jobs, items, printing views, request guard, job RPC functions | ☐ |
+| `0009_delete_print_job.sql` | 6a | `delete_print_job` (reverts a completed job first) | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -90,6 +99,7 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - History shows the latest 200 jobs only (enough for now; add paging later if needed).
 - Items on a printing job can't be edited; cancel it and start a new plate instead.
 - Cancelled jobs can't be reverted.
+- The UI fixes (sidebar, header, control heights, notepad) passed lint and the build, but haven't been looked at in a browser yet, because I can't log in for you.
 - No `/admin/categories` page and no notepad count on the queue yet (Phase 6b).
 
 **Decisions made along the way**

@@ -262,7 +262,7 @@ function QueueLine({
               value={plateQty}
               onChange={(e) => onPlateQty(id, e.target.value.replace(/[^0-9]/g, ""))}
               title={`Up to ${left}`}
-              className={`w-16 rounded-md border bg-white px-2 py-2 text-center text-base tabular-nums outline-none focus:ring-1 lg:w-full ${
+              className={`h-11 w-16 rounded-md border bg-white px-2 py-2 text-center text-base tabular-nums outline-none focus:ring-1 lg:w-full ${
                 Number(plateQty) > left || Number(plateQty) < 1
                   ? "border-red-600 focus:ring-red-600"
                   : "border-neutral-900 focus:ring-neutral-900"

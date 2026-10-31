@@ -97,7 +97,8 @@ export function NotepadView({
   const handleFocused = useCallback(() => setFocusKey(null), []);
 
   return (
-    <div className="max-w-3xl rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-4 sm:px-6">
+    // No card or paper effect: the lines sit straight on the white page.
+    <div className="max-w-3xl">
       <ul className={handwriting.className}>
         {items.map((item, i) => (
           <NoteRow
@@ -296,7 +297,7 @@ function NoteRow({
   const saved = Boolean(item.line);
 
   return (
-    <li className="flex items-center gap-3 border-b border-amber-100 py-1">
+    <li className="flex items-center gap-3 py-1">
       {isAdmin && (
         <input
           type="checkbox"

@@ -4,8 +4,11 @@
 import { URGENCIES, URGENCY_STYLES, scaleLabel, type Urgency } from "@/lib/requests";
 import type { SaveStatus } from "@/lib/use-line-autosave";
 
-const box =
-  "rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
+// Every control in a request row is the same height (h-11, 44px), so the
+// quantity, urgency, note and size boxes line up.
+const ROW_HEIGHT = "h-11";
+
+const box = `${ROW_HEIGHT} rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900`;
 
 export function QuantityInput({
   value,
@@ -51,7 +54,7 @@ export function UrgencySelect({
       aria-label={label}
       value={value ?? ""}
       onChange={(e) => onChange((e.target.value || null) as Urgency | null)}
-      className={`w-full cursor-pointer rounded-full border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-1 ${URGENCY_STYLES[value ?? "none"]}`}
+      className={`${ROW_HEIGHT} w-full cursor-pointer rounded-full border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-1 ${URGENCY_STYLES[value ?? "none"]}`}
     >
       <option value="" className="bg-white text-neutral-900">
         —

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   cancelPrintJob,
   completePrintJob,
+  deletePrintJob,
   revertPrintJob,
   updateCompletedResult,
   updatePrintJobDetails,
@@ -24,7 +25,19 @@ import {
 import { formatGBP } from "@/lib/materials";
 
 // Which job has a form open, and which form.
-type Open = { jobId: string; mode: "complete" | "cancel" | "details" | "result" | "revert" } | null;
+type Open = {
+  jobId: string;
+  mode: "complete" | "cancel" | "details" | "result" | "revert" | "delete";
+} | null;
+
+// What deleting does, by status (see 0009_delete_print_job.sql).
+const DELETE_TEXT: Record<Job["status"], string> = {
+  printing:
+    "Delete this job for good? Its items stop counting as printing, so the requests can go on another plate. This can't be undone.",
+  completed:
+    "Delete this job for good? Everything it took off the requests is put back first (recreating requests that had reached 0), and its prints no longer count towards printed totals. This can't be undone.",
+  cancelled: "Delete this cancelled job for good? This can't be undone.",
+};
 
 const HISTORY_COLUMNS = "md:grid-cols-[8.5rem_8.5rem_minmax(0,1fr)_5.5rem_5rem_5rem_5rem]";
 
@@ -107,6 +120,9 @@ export function JobsView({
                     <ActionButton active={mode === "cancel"} onClick={() => toggle(job.id, "cancel")}>
                       Cancel job
                     </ActionButton>
+                    <ActionButton danger active={mode === "delete"} onClick={() => toggle(job.id, "delete")}>
+                      Delete
+                    </ActionButton>
                   </div>
                   {mode === "complete" && (
                     <ResultForm
@@ -122,6 +138,16 @@ export function JobsView({
                       job={job}
                       options={options}
                       onDone={() => done(`Saved ${jobName(job)} ✓`)}
+                      onClose={() => setOpen(null)}
+                    />
+                  )}
+                  {mode === "delete" && (
+                    <Confirm
+                      danger
+                      text={DELETE_TEXT[job.status]}
+                      confirmLabel="Yes, delete job"
+                      onConfirm={() => deletePrintJob(job.id)}
+                      onDone={() => done(`Deleted ${jobName(job)}`)}
                       onClose={() => setOpen(null)}
                     />
                   )}
@@ -227,7 +253,20 @@ export function JobsView({
                               </ActionButton>
                             </>
                           )}
+                          <ActionButton danger active={mode === "delete"} onClick={() => toggle(job.id, "delete")}>
+                            Delete
+                          </ActionButton>
                         </div>
+                        {mode === "delete" && (
+                          <Confirm
+                            danger
+                            text={DELETE_TEXT[job.status]}
+                            confirmLabel="Yes, delete job"
+                            onConfirm={() => deletePrintJob(job.id)}
+                            onDone={() => done(`Deleted ${jobName(job)}`)}
+                            onClose={() => setOpen(null)}
+                          />
+                        )}
                         {mode === "details" && (
                           <DetailsForm
                             job={job}
@@ -326,11 +365,13 @@ function ActionButton({
   onClick,
   active,
   primary = false,
+  danger = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   active: boolean;
   primary?: boolean;
+  danger?: boolean; // red, for Delete
 }) {
   return (
     <button
@@ -338,9 +379,13 @@ function ActionButton({
       aria-pressed={active}
       onClick={onClick}
       className={`rounded-md border px-4 py-2 text-sm font-medium ${
-        primary || active
-          ? "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700"
-          : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+        danger
+          ? active
+            ? "border-red-700 bg-red-700 text-white hover:bg-red-800"
+            : "border-red-300 text-red-700 hover:bg-red-50"
+          : primary || active
+            ? "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700"
+            : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
       }`}
     >
       {children}
@@ -502,7 +547,9 @@ function Confirm({
   onConfirm,
   onDone,
   onClose,
+  danger = false,
 }: {
+  danger?: boolean;
   text: string;
   confirmLabel: string;
   onConfirm: () => Promise<JobResult>;
@@ -511,9 +558,12 @@ function Confirm({
 }) {
   const { error, pending, run } = useRun(onDone);
   return (
-    <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4">
+    <div
+      className={`mt-4 rounded-md border p-4 ${danger ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}
+    >
       <p>{text}</p>
       <FormButtons
+        danger={danger}
         submitLabel={confirmLabel}
         pending={pending}
         error={error}
@@ -532,7 +582,9 @@ function FormButtons({
   onSubmit,
   onClose,
   closeLabel = "Cancel",
+  danger = false,
 }: {
+  danger?: boolean;
   submitLabel: string;
   pending: boolean;
   error: string | null;
@@ -546,7 +598,9 @@ function FormButtons({
         type="button"
         onClick={onSubmit}
         disabled={pending}
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-40"
+        className={`rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${
+          danger ? "bg-red-700 hover:bg-red-800" : "bg-neutral-900 hover:bg-neutral-700"
+        }`}
       >
         {pending ? "Saving…" : submitLabel}
       </button>
