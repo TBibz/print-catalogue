@@ -1,6 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CatalogueModel, Category } from "@/lib/catalogue";
+import {
+  ADMIN_MODEL_COLUMNS,
+  type AdminModel,
+  type CatalogueModel,
+  type Category,
+} from "@/lib/catalogue";
 import {
   REQUEST_LINE_COLUMNS,
   type RequestLine,
@@ -50,6 +55,19 @@ export async function loadModels(
     if (!includeHidden) query = query.neq("availability", "hidden");
     return query.order("code").range(from, to).returns<CatalogueModel[]>();
   });
+}
+
+// Every model straight from the models table, including admin_notes and
+// retired ones. RLS only lets the admin do this.
+export async function loadAdminModels(supabase: SupabaseClient) {
+  return fetchAll<AdminModel>((from, to) =>
+    supabase
+      .from("models")
+      .select(ADMIN_MODEL_COLUMNS)
+      .order("code")
+      .range(from, to)
+      .returns<AdminModel[]>(),
+  );
 }
 
 export async function loadRequestLines(supabase: SupabaseClient) {

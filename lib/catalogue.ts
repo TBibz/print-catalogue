@@ -50,3 +50,22 @@ export function showNewBadge(
 ) {
   return model.show_new_badge && printedTotal < NEW_BADGE_PRINT_LIMIT;
 }
+
+// The sizes usually printed. Any other text is allowed too.
+export const USUAL_SCALES = ["28mm", "54mm", "60mm", "70mm", "80mm", "100mm"];
+
+export const AVAILABILITY_LABELS: Record<Availability, string> = {
+  available: "Available",
+  coming_soon: "On its way",
+  hidden: "Retired",
+};
+
+// A full row from the models table, as only the admin can read it.
+export type AdminModel = CatalogueModel & {
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const ADMIN_MODEL_COLUMNS =
+  "id, code, code_key, name, category_id, default_scale, other_scales, availability, image_path, show_new_badge, admin_notes, created_at, updated_at";

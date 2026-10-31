@@ -1,4 +1,5 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,3 +27,11 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
     .maybeSingle<Profile>();
   return data;
 });
+
+// For admin pages: sends anyone else back to the catalogue.
+// (proxy.ts does this too; this is the second line of defence.)
+export async function requireAdmin(): Promise<Profile> {
+  const profile = await getCurrentProfile();
+  if (profile?.role !== "admin") redirect("/catalogue");
+  return profile;
+}

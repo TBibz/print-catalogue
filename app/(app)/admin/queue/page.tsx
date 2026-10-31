@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getCurrentProfile } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadCategories, loadModels, loadRequestLines } from "@/lib/data";
 import { compareQueue } from "@/lib/requests";
@@ -22,8 +21,7 @@ export default function QueuePage() {
 
 async function QueueData() {
   // proxy.ts already sends non-admins away; this double-checks.
-  const profile = await getCurrentProfile();
-  if (profile?.role !== "admin") redirect("/catalogue");
+  await requireAdmin();
 
   const supabase = await createClient();
   let rows: QueueRow[] | null = null;
