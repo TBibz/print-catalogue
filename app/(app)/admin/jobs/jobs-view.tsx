@@ -59,12 +59,12 @@ export function JobsView({
   printing,
   history,
   options,
-  historyLimit,
+  historyTotal,
 }: {
   printing: Job[];
   history: Job[];
   options: JobFormOptions;
-  historyLimit: number;
+  historyTotal: number; // finished jobs in all (the list shows the latest HISTORY_LIMIT)
 }) {
   const [open, setOpen] = useState<Open>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -171,7 +171,7 @@ export function JobsView({
 
       <section aria-labelledby="history-heading">
         <h2 id="history-heading" className="mb-3 text-lg font-semibold">
-          History
+          History <span className="font-normal text-neutral-500">({historyTotal})</span>
         </h2>
         {sortedHistory.length === 0 ? (
           <p className="py-8 text-center text-neutral-500">No finished jobs yet.</p>
@@ -306,9 +306,10 @@ export function JobsView({
                 );
               })}
             </ul>
-            {history.length >= historyLimit && (
+            {historyTotal > history.length && (
               <p className="py-3 text-center text-sm text-neutral-500">
-                Showing the latest {historyLimit} jobs.
+                Showing latest {history.length} of {historyTotal} finished jobs. Older ones still count on the
+                Money page.
               </p>
             )}
           </div>

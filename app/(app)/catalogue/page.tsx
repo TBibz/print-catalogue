@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import {
   loadCategories,
+  loadCategoryCounts,
   loadColourOptions,
   loadModels,
   loadPrintTotals,
@@ -31,14 +32,15 @@ async function CatalogueData() {
 
   let data;
   try {
-    const [categories, models, lines, printTotals, colours] = await Promise.all([
+    const [categories, models, lines, printTotals, colours, categoryCounts] = await Promise.all([
       loadCategories(supabase),
       loadModels(supabase),
       loadRequestLines(supabase),
       loadPrintTotals(supabase),
       loadColourOptions(supabase),
+      loadCategoryCounts(supabase),
     ]);
-    data = { categories, models, lines, printTotals, colours };
+    data = { categories, models, lines, printTotals, colours, categoryCounts };
   } catch (error) {
     console.error("Loading the catalogue failed:", error);
     data = null;

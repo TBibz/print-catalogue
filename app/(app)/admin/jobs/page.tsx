@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { HISTORY_LIMIT, loadJobFormOptions, loadJobs } from "@/lib/data";
+import { loadJobFormOptions, loadJobHistory, loadPrintingJobs } from "@/lib/data";
 import { JobsView } from "./jobs-view";
 
 export const metadata: Metadata = { title: "Jobs · Print Catalogue" };
@@ -25,11 +25,11 @@ async function JobsData() {
   let data = null;
   try {
     const [printing, history, options] = await Promise.all([
-      loadJobs(supabase, "printing"),
-      loadJobs(supabase, "history"),
+      loadPrintingJobs(supabase),
+      loadJobHistory(supabase),
       loadJobFormOptions(supabase),
     ]);
-    data = { printing, history, options, historyLimit: HISTORY_LIMIT };
+    data = { printing, history: history.jobs, historyTotal: history.total, options };
   } catch (error) {
     console.error("Loading jobs failed:", error);
   }

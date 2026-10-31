@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { loadSettings } from "@/lib/data";
 import { SettingsForm } from "./settings-form";
 
 export const metadata: Metadata = { title: "Settings · Print Catalogue" };
@@ -20,18 +21,16 @@ export default function SettingsPage() {
 async function SettingsData() {
   await requireAdmin();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("settings")
-    .select("key, value")
-    .returns<{ key: string; value: string }[]>();
-
-  if (error) {
-    console.error("Loading settings failed:", error.message);
+  let settings;
+  try {
+    settings = await loadSettings(supabase);
+  } catch (error) {
+    console.error("Loading settings failed:", error);
     return (
       <p role="alert" className="text-red-700">
         Sorry, the settings couldn’t be loaded. Please refresh the page.
       </p>
     );
   }
-  return <SettingsForm values={Object.fromEntries(data.map((s) => [s.key, s.value]))} />;
+  return <SettingsForm values={Object.fromEntries(settings.map((s) => [s.key, s.value]))} />;
 }

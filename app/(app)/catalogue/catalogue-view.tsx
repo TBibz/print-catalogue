@@ -13,6 +13,7 @@ import { imageUrl } from "@/lib/images";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
 import type { ColourOption } from "@/lib/colours";
+import type { CategoryCounts } from "@/lib/data";
 import {
   ColourSelect,
   NoteInput,
@@ -103,6 +104,7 @@ export function CatalogueView({
   lines,
   printTotals,
   colours,
+  categoryCounts,
 }: {
   categories: Category[];
   models: CatalogueModel[];
@@ -111,6 +113,8 @@ export function CatalogueView({
   printTotals: Record<string, number>;
   // Colours the colour dropdown can show (e.g. for BASES).
   colours: ColourOption[];
+  // Models per category, counted in the database.
+  categoryCounts: CategoryCounts;
 }) {
   const [activeTab, setActiveTab] = useState<string>(ALL);
   const [query, setQuery] = useState("");
@@ -149,17 +153,18 @@ export function CatalogueView({
       .sort(compareModels);
   }, [categories, models, printTotals]);
 
-  // How many models each category has (shown on its tab).
-  const counts = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of rows) map.set(r.category_id, (map.get(r.category_id) ?? 0) + 1);
-    return map;
-  }, [rows]);
+  // How many models each category shows, counted in the database
+  // (category_model_counts), so it's right however many models there are.
+  const counts = useMemo(
+    () => new Map(Object.entries(categoryCounts).map(([id, c]) => [id, c.visible])),
+    [categoryCounts],
+  );
+  const allCount = [...counts.values()].reduce((sum, n) => sum + n, 0);
 
-  // Only show tabs for categories that have something in them.
+  // Only show categories that have something in them.
   const tabs = useMemo(() => {
     return categories
-      .filter((c) => counts.has(c.id))
+      .filter((c) => (counts.get(c.id) ?? 0) > 0)
       .sort(compareCategories);
   }, [categories, counts]);
 
@@ -289,7 +294,7 @@ export function CatalogueView({
               <li>
                 <CategoryButton
                   label="All"
-                  count={rows.length}
+                  count={allCount}
                   selected={shownTab === ALL}
                   onClick={() => chooseCategory(ALL)}
                 />
@@ -319,7 +324,7 @@ export function CatalogueView({
               onChange={(e) => chooseCategory(e.target.value)}
               className="h-11 w-full max-w-md cursor-pointer rounded-md border border-neutral-300 bg-white px-3 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
             >
-              <option value={ALL}>All ({rows.length})</option>
+              <option value={ALL}>All ({allCount})</option>
               {tabs.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} ({counts.get(c.id) ?? 0})

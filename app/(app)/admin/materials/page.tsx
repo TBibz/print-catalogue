@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { MATERIAL_COLUMNS, type Material } from "@/lib/materials";
+import { loadMaterials } from "@/lib/data";
 import { MaterialsList } from "./materials-list";
 
 export const metadata: Metadata = { title: "Materials · Print Catalogue" };
@@ -21,20 +21,16 @@ export default function MaterialsPage() {
 async function MaterialsData() {
   await requireAdmin();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("materials")
-    .select(MATERIAL_COLUMNS)
-    .order("type")
-    .order("name")
-    .returns<Material[]>();
-
-  if (error) {
-    console.error("Loading materials failed:", error.message);
+  let materials;
+  try {
+    materials = await loadMaterials(supabase);
+  } catch (error) {
+    console.error("Loading materials failed:", error);
     return (
       <p role="alert" className="text-red-700">
         Sorry, the materials couldn’t be loaded. Please refresh the page.
       </p>
     );
   }
-  return <MaterialsList materials={data} />;
+  return <MaterialsList materials={materials} />;
 }

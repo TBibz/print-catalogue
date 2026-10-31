@@ -15,32 +15,44 @@ import type { ColourOption } from "@/lib/colours";
 import type { MoneyMonth, MoneySettings, PrinterStats, TopModel } from "@/lib/money-data";
 import { DEFAULT_RESIN_DIVISOR, JOB_COLUMNS, type Job, type JobFormOptions } from "@/lib/jobs";
 import { MATERIAL_COLUMNS, PRINTER_COLUMNS, type Material, type Printer } from "@/lib/materials";
+import { NOTE_LINE_COLUMNS, type NoteLine } from "@/lib/notepad";
+import { fetchAll } from "@/lib/fetch-all";
 
-// Server-side data loading shared by the catalogue and the admin queue.
+// Server-side data loading shared by the pages.
 // Every query runs as the logged-in user, so RLS applies.
-
-const PAGE_SIZE = 1000; // Supabase returns at most 1,000 rows per request
-
-// Runs a query page by page until everything has been read.
-async function fetchAll<T>(
-  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
-): Promise<T[]> {
-  const all: T[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await page(from, from + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    all.push(...(data ?? []));
-    if (!data || data.length < PAGE_SIZE) return all;
-  }
-}
+//
+// Every list is read with fetchAll() (see lib/fetch-all.ts): Supabase only
+// returns up to "Max rows" rows per request and silently drops the rest.
+// Counts and totals are worked out in the database (views / functions).
 
 export async function loadCategories(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("categories")
-    .select("id, name, sort_order, has_colour_options")
-    .returns<Category[]>();
-  if (error) throw new Error(error.message);
-  return data;
+  return fetchAll<Category>((from, to) =>
+    supabase
+      .from("categories")
+      .select("id, name, sort_order, has_colour_options")
+      .order("sort_order")
+      .order("id")
+      .range(from, to)
+      .returns<Category[]>(),
+  );
+}
+
+// Model counts per category, counted in the database (0013).
+export type CategoryCounts = Record<string, { total: number; visible: number }>;
+
+export async function loadCategoryCounts(supabase: SupabaseClient): Promise<CategoryCounts> {
+  const rows = await fetchAll<{ category_id: string; total_models: number; visible_models: number }>(
+    (from, to) =>
+      supabase
+        .from("category_model_counts")
+        .select("category_id, total_models, visible_models")
+        .order("category_id")
+        .range(from, to)
+        .returns<{ category_id: string; total_models: number; visible_models: number }[]>(),
+  );
+  return Object.fromEntries(
+    rows.map((r) => [r.category_id, { total: r.total_models, visible: r.visible_models }]),
+  );
 }
 
 // Models from the catalogue_models view (no admin_notes). Retired ("hidden")
@@ -80,6 +92,7 @@ export async function loadRequestLines(supabase: SupabaseClient) {
       .from("request_lines")
       .select(REQUEST_LINE_COLUMNS)
       .order("created_at")
+      .order("id")
       .range(from, to)
       .returns<RequestLineRow[]>(),
   );
@@ -98,6 +111,7 @@ export async function addPrinting(
     supabase
       .from("request_line_printing")
       .select("request_line_id, printing")
+      .order("request_line_id")
       .range(from, to)
       .returns<{ request_line_id: string; printing: number }[]>(),
   );
@@ -112,6 +126,7 @@ export async function loadPrintTotals(supabase: SupabaseClient) {
     supabase
       .from("model_print_totals")
       .select("model_id, printed_total")
+      .order("model_id")
       .range(from, to)
       .returns<{ model_id: string; printed_total: number }[]>(),
   );
@@ -121,54 +136,102 @@ export async function loadPrintTotals(supabase: SupabaseClient) {
 // Printers, materials and the resin divisor, for the job form (admin only).
 export async function loadJobFormOptions(supabase: SupabaseClient): Promise<JobFormOptions> {
   const [printers, materials, setting] = await Promise.all([
-    supabase.from("printers").select(PRINTER_COLUMNS).order("name").returns<Printer[]>(),
-    supabase.from("materials").select(MATERIAL_COLUMNS).order("name").returns<Material[]>(),
+    loadPrinters(supabase),
+    loadMaterials(supabase),
     supabase.from("settings").select("value").eq("key", "resin_charge_divisor").maybeSingle<{ value: string }>(),
   ]);
-  for (const r of [printers, materials, setting]) if (r.error) throw new Error(r.error.message);
+  if (setting.error) throw new Error(setting.error.message);
   const divisor = Number(setting.data?.value);
-  return {
-    printers: printers.data ?? [],
-    materials: materials.data ?? [],
-    divisor: divisor > 0 ? divisor : DEFAULT_RESIN_DIVISOR,
-  };
+  return { printers, materials, divisor: divisor > 0 ? divisor : DEFAULT_RESIN_DIVISOR };
 }
 
-// Jobs with their items (admin only). `status` "printing" gives every
-// printing job; "history" the most recent finished ones.
+export async function loadPrinters(supabase: SupabaseClient) {
+  return fetchAll<Printer>((from, to) =>
+    supabase.from("printers").select(PRINTER_COLUMNS).order("name").order("id").range(from, to).returns<Printer[]>(),
+  );
+}
+
+export async function loadMaterials(supabase: SupabaseClient) {
+  return fetchAll<Material>((from, to) =>
+    supabase
+      .from("materials")
+      .select(MATERIAL_COLUMNS)
+      .order("type")
+      .order("name")
+      .order("id")
+      .range(from, to)
+      .returns<Material[]>(),
+  );
+}
+
+export async function loadSettings(supabase: SupabaseClient) {
+  return fetchAll<{ key: string; value: string }>((from, to) =>
+    supabase.from("settings").select("key, value").order("key").range(from, to).returns<{ key: string; value: string }[]>(),
+  );
+}
+
+export async function loadNoteLines(supabase: SupabaseClient) {
+  return fetchAll<NoteLine>((from, to) =>
+    supabase
+      .from("notepad_lines")
+      .select(NOTE_LINE_COLUMNS)
+      .order("position")
+      .order("created_at")
+      .order("id")
+      .range(from, to)
+      .returns<NoteLine[]>(),
+  );
+}
+
+// Jobs with their items (admin only). Every printing job; for history, the
+// latest HISTORY_LIMIT finished jobs (a deliberate cap) plus how many
+// finished jobs there are in all, so the page can say "latest 200 of N".
 export const HISTORY_LIMIT = 200;
 
-export async function loadJobs(supabase: SupabaseClient, which: "printing" | "history") {
-  let query = supabase.from("print_jobs").select(JOB_COLUMNS);
-  query =
-    which === "printing"
-      ? query.eq("status", "printing").order("started_at")
-      : query.neq("status", "printing").order("started_at", { ascending: false }).limit(HISTORY_LIMIT);
-  const { data, error } = await query.returns<Job[]>();
-  if (error) throw new Error(error.message);
-  return data ?? [];
+export async function loadPrintingJobs(supabase: SupabaseClient) {
+  return fetchAll<Job>((from, to) =>
+    supabase
+      .from("print_jobs")
+      .select(JOB_COLUMNS)
+      .eq("status", "printing")
+      .order("started_at")
+      .order("id")
+      .range(from, to)
+      .returns<Job[]>(),
+  );
 }
 
-// How many models (including retired ones) each category has: { id: count }.
-// Admin only (reads the models table).
-export async function loadModelCountsByCategory(supabase: SupabaseClient) {
-  const rows = await fetchAll<{ category_id: string }>((from, to) =>
-    supabase.from("models").select("category_id").range(from, to).returns<{ category_id: string }[]>(),
-  );
-  const counts: Record<string, number> = {};
-  for (const r of rows) counts[r.category_id] = (counts[r.category_id] ?? 0) + 1;
-  return counts;
+export async function loadJobHistory(supabase: SupabaseClient) {
+  const [jobs, count] = await Promise.all([
+    fetchAll<Job>(
+      (from, to) =>
+        supabase
+          .from("print_jobs")
+          .select(JOB_COLUMNS)
+          .neq("status", "printing")
+          .order("started_at", { ascending: false })
+          .order("id")
+          .range(from, to)
+          .returns<Job[]>(),
+      { max: HISTORY_LIMIT },
+    ),
+    supabase.from("print_jobs").select("id", { count: "exact", head: true }).neq("status", "printing"),
+  ]);
+  if (count.error) throw new Error(count.error.message);
+  return { jobs, total: count.count ?? jobs.length };
 }
 
 // Colours the catalogue's colour dropdown can show (names and stock only).
 export async function loadColourOptions(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("colour_options")
-    .select("id, name, colour, colour_hex, available, in_stock")
-    .order("name")
-    .returns<ColourOption[]>();
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  return fetchAll<ColourOption>((from, to) =>
+    supabase
+      .from("colour_options")
+      .select("id, name, colour, colour_hex, available, in_stock")
+      .order("name")
+      .order("id")
+      .range(from, to)
+      .returns<ColourOption[]>(),
+  );
 }
 
 // How many notepad lines are not ticked off yet (blank lines don't count).
@@ -185,10 +248,15 @@ export async function loadUntickedNoteCount(supabase: SupabaseClient) {
 // ---- Money page (admin only) ------------------------------------------------
 
 export async function loadMoneyMonths(supabase: SupabaseClient) {
-  const { data, error } = await supabase.rpc("money_by_month");
-  if (error) throw new Error(error.message);
+  // A set-returning function is limited by "Max rows" too, so read it in pages.
+  const data = await fetchAll<MoneyMonth>((from, to) =>
+    supabase.rpc("money_by_month").order("month", { ascending: false }).range(from, to) as unknown as PromiseLike<{
+      data: MoneyMonth[] | null;
+      error: { message: string } | null;
+    }>,
+  );
   // Amounts can arrive as text from numeric columns: make them numbers.
-  return ((data ?? []) as MoneyMonth[]).map((r) => ({
+  return data.map((r) => ({
     ...r,
     charge: Number(r.charge),
     job_costs: Number(r.job_costs),
@@ -213,9 +281,13 @@ export async function loadMoneySettings(supabase: SupabaseClient): Promise<Money
 }
 
 export async function loadPrinterStats(supabase: SupabaseClient) {
-  const { data, error } = await supabase.rpc("print_stats_by_printer");
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as PrinterStats[]).map((r) => ({ ...r, charge: Number(r.charge) }));
+  const data = await fetchAll<PrinterStats>((from, to) =>
+    supabase.rpc("print_stats_by_printer").order("printer_name").order("printer_id").range(from, to) as unknown as PromiseLike<{
+      data: PrinterStats[] | null;
+      error: { message: string } | null;
+    }>,
+  );
+  return data.map((r) => ({ ...r, charge: Number(r.charge) }));
 }
 
 // The most printed models (successful prints in completed jobs).

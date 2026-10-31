@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { loadCategories, loadModelCountsByCategory } from "@/lib/data";
+import { loadCategories, loadCategoryCounts } from "@/lib/data";
 import { CategoriesList } from "./categories-list";
 
 export const metadata: Metadata = { title: "Categories · Print Catalogue" };
@@ -24,10 +24,9 @@ async function CategoriesData() {
 
   let data = null;
   try {
-    const [categories, modelCounts] = await Promise.all([
-      loadCategories(supabase),
-      loadModelCountsByCategory(supabase),
-    ]);
+    const [categories, counts] = await Promise.all([loadCategories(supabase), loadCategoryCounts(supabase)]);
+    // Every model, retired ones included (a category with any can't be deleted).
+    const modelCounts = Object.fromEntries(Object.entries(counts).map(([id, c]) => [id, c.total]));
     data = { categories, modelCounts };
   } catch (error) {
     console.error("Loading categories failed:", error);

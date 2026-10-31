@@ -14,6 +14,7 @@
  * Re-running during setup is safe: models are matched ("upserted") by code,
  * so nothing is duplicated.
  */
+import { fetchAll } from "../lib/fetch-all";
 import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "csv-parse/sync";
 import { config } from "dotenv";
@@ -125,19 +126,19 @@ async function main() {
   const existingModels = new Map<string, string>(); // code_key -> code
 
   if (supabase) {
-    const { data: cats, error: catErr } = await supabase.from("categories").select("id, name");
-    if (catErr) fail(`Could not read categories: ${catErr.message}`);
-    for (const c of cats ?? []) existingCategories.set(c.name, c.id);
-
-    // Supabase returns at most 1,000 rows per request, so read in pages.
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase
-        .from("models")
-        .select("code, code_key")
-        .range(from, from + 999);
-      if (error) fail(`Could not read models: ${error.message}`);
-      for (const m of data ?? []) existingModels.set(m.code_key, m.code);
-      if (!data || data.length < 1000) break;
+    // Supabase returns at most "Max rows" per request, so read in pages
+    // (see lib/fetch-all.ts).
+    try {
+      const cats = await fetchAll<{ id: string; name: string }>((from, to) =>
+        supabase.from("categories").select("id, name").order("id").range(from, to),
+      );
+      for (const c of cats) existingCategories.set(c.name, c.id);
+      const models = await fetchAll<{ code: string; code_key: string }>((from, to) =>
+        supabase.from("models").select("code, code_key").order("id").range(from, to),
+      );
+      for (const m of models) existingModels.set(m.code_key, m.code);
+    } catch (error) {
+      fail(`Could not read the existing catalogue: ${(error as Error).message}`);
     }
   }
 

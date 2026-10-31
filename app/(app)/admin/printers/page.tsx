@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PRINTER_COLUMNS, type Printer } from "@/lib/materials";
+import { loadPrinters } from "@/lib/data";
 import { PrintersList } from "./printers-list";
 
 export const metadata: Metadata = { title: "Printers · Print Catalogue" };
@@ -21,19 +21,16 @@ export default function PrintersPage() {
 async function PrintersData() {
   await requireAdmin();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("printers")
-    .select(PRINTER_COLUMNS)
-    .order("created_at")
-    .returns<Printer[]>();
-
-  if (error) {
-    console.error("Loading printers failed:", error.message);
+  let printers;
+  try {
+    printers = await loadPrinters(supabase);
+  } catch (error) {
+    console.error("Loading printers failed:", error);
     return (
       <p role="alert" className="text-red-700">
         Sorry, the printers couldn’t be loaded. Please refresh the page.
       </p>
     );
   }
-  return <PrintersList printers={data} />;
+  return <PrintersList printers={printers} />;
 }
