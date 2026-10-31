@@ -8,8 +8,10 @@ import {
   type CategoryInput,
 } from "@/app/actions/categories";
 import { compareCategories, type Category } from "@/lib/catalogue";
+import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
+import { ColourPicker } from "@/components/colour-picker";
 
-const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_9rem_5rem_11rem]";
+const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_4rem_9rem_5rem_11rem]";
 const box =
   "h-11 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 
@@ -99,8 +101,8 @@ export function CategoriesList({
     <div className="max-w-4xl">
       <p className="mb-4 text-sm text-neutral-600">
         Drag a category by its ⠿ handle (or use ↑ ↓) to change the order. The catalogue sidebar and
-        the “All” list follow this order. Categories with colour options let each request choose a
-        colour.
+        the “All” list follow this order. A category’s colour highlights it in the sidebar. Categories
+        with colour options let each request choose a colour.
       </p>
 
       <div className="mb-4 flex justify-end">
@@ -132,6 +134,7 @@ export function CategoriesList({
         >
           <span>Order</span>
           <span>Name</span>
+          <span>Colour</span>
           <span>Colour options</span>
           <span className="text-right">Models</span>
           <span />
@@ -209,6 +212,7 @@ function CategoryRow({
     id: category?.id ?? null,
     name: category?.name ?? "",
     hasColourOptions: category?.has_colour_options ?? false,
+    colourHex: category?.colour_hex ?? DEFAULT_COLOUR_HEX,
   });
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -220,7 +224,8 @@ function CategoryRow({
   const dirty =
     !category ||
     values.name.trim() !== category.name ||
-    values.hasColourOptions !== category.has_colour_options;
+    values.hasColourOptions !== category.has_colour_options ||
+    values.colourHex !== category.colour_hex;
 
   function save() {
     setError(null);
@@ -232,6 +237,7 @@ function CategoryRow({
         id: result.category.id,
         name: result.category.name,
         hasColourOptions: result.category.has_colour_options,
+        colourHex: result.category.colour_hex,
       });
     });
   }
@@ -319,6 +325,11 @@ function CategoryRow({
           autoFocus={!category}
           onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
           className={`${box} col-span-2 md:col-span-1`}
+        />
+        <ColourPicker
+          label={`Colour of ${label}`}
+          value={values.colourHex}
+          onChange={(v) => setValues((x) => ({ ...x, colourHex: v }))}
         />
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input

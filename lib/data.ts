@@ -29,7 +29,7 @@ export async function loadCategories(supabase: SupabaseClient) {
   return fetchAll<Category>((from, to) =>
     supabase
       .from("categories")
-      .select("id, name, sort_order, has_colour_options")
+      .select("id, name, sort_order, has_colour_options, colour_hex")
       .order("sort_order")
       .order("id")
       .range(from, to)

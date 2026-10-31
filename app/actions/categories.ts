@@ -10,6 +10,7 @@ export type CategoryInput = {
   id: string | null; // null = a new category
   name: string;
   hasColourOptions: boolean;
+  colourHex: string; // "#rrggbb"
 };
 
 type Fail = { ok: false; error: string };
@@ -22,9 +23,11 @@ export async function saveCategory(
 
   if (!name) return { ok: false, error: "Please enter a name." };
   if (name.length > 60) return { ok: false, error: "Names can be at most 60 characters." };
+  const colourHex = String(input.colourHex ?? "").toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(colourHex)) return { ok: false, error: "Pick a colour." };
 
   const supabase = await createClient();
-  const values = { name, has_colour_options: Boolean(input.hasColourOptions) };
+  const values = { name, has_colour_options: Boolean(input.hasColourOptions), colour_hex: colourHex };
   let query;
   if (input.id) {
     query = supabase.from("categories").update(values).eq("id", input.id);
@@ -39,7 +42,7 @@ export async function saveCategory(
     query = supabase.from("categories").insert({ ...values, sort_order: (last?.sort_order ?? 0) + 1 });
   }
   const { data, error } = await query
-    .select("id, name, sort_order, has_colour_options")
+    .select("id, name, sort_order, has_colour_options, colour_hex")
     .maybeSingle<Category>();
   if (error) {
     console.error("categories:", error.message);

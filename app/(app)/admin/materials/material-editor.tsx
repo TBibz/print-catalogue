@@ -18,6 +18,7 @@ import {
 } from "@/lib/materials";
 import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
 import { ColourLabel } from "@/components/colour-label";
+import { ColourPicker } from "@/components/colour-picker";
 
 // Column widths shared by the list rows and the editor (md screens and up).
 export const MATERIAL_GRID =
@@ -262,13 +263,7 @@ export function MaterialEditor({
               Colour
             </label>
             <div className="flex max-w-xs items-center gap-2">
-              <input
-                type="color"
-                aria-label="Pick the colour"
-                value={values.colourHex}
-                onChange={(e) => set("colourHex", e.target.value)}
-                className="h-11 w-14 shrink-0 cursor-pointer rounded-md border border-neutral-300 bg-white p-1"
-              />
+              <ColourPicker label="Pick the colour" value={values.colourHex} onChange={(v) => set("colourHex", v)} />
               <input
                 id="mat-colour"
                 value={values.colour}

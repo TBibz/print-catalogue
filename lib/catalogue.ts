@@ -7,6 +7,7 @@ export type Category = {
   name: string;
   sort_order: number;
   has_colour_options: boolean;
+  colour_hex: string; // highlights it in the catalogue sidebar
 };
 
 // A row from the catalogue_models view (models without admin_notes).
