@@ -41,6 +41,7 @@ export function ModelsList({
   const [models, setModels] = useState(serverModels);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [missingImageOnly, setMissingImageOnly] = useState(false);
   const [editing, setEditing] = useState<Editing>(null);
   const [message, setMessage] = useState<string | null>(null);
   const editorDirty = useRef(false);
@@ -66,6 +67,8 @@ export function ModelsList({
       .sort(compareModels);
   }, [categories, models]);
 
+  const missingImages = rows.filter((r) => !r.image_path).length;
+
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { all: rows.length, available: 0, coming_soon: 0, hidden: 0 };
     for (const r of rows) c[r.availability]++;
@@ -77,6 +80,7 @@ export function ModelsList({
   const visible = rows.filter((r) => {
     if (r.id === editing) return true;
     if (filter !== "all" && r.availability !== filter) return false;
+    if (missingImageOnly && r.image_path) return false;
     const haystack = `${r.code} ${r.name} ${r.categoryName} ${r.admin_notes ?? ""}`.toLowerCase();
     return terms.every((t) => haystack.includes(t));
   });
@@ -113,12 +117,18 @@ export function ModelsList({
     setEditing(null);
   }
 
+  // Image changes save straight away, without closing the editor.
+  const handleImageChanged = useCallback((modelId: string, path: string | null) => {
+    setModels((prev) => prev.map((m) => (m.id === modelId ? { ...m, image_path: path } : m)));
+  }, []);
+
   const editorProps = {
     categories: sortedCategories,
     onSaved: handleSaved,
     onDeleted: handleDeleted,
     onCancel: () => openEditor(null),
     onDirtyChange: handleDirtyChange,
+    onImageChanged: handleImageChanged,
   };
 
   return (
@@ -166,6 +176,16 @@ export function ModelsList({
           </button>
         ))}
       </div>
+
+      <label className="mb-4 flex w-fit cursor-pointer items-center gap-2.5 text-sm select-none">
+        <input
+          type="checkbox"
+          checked={missingImageOnly}
+          onChange={(e) => setMissingImageOnly(e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-neutral-900"
+        />
+        Without an image only ({missingImages})
+      </label>
 
       {message && (
         <p role="status" className="mb-3 rounded-md bg-green-50 px-3 py-2 text-green-800">

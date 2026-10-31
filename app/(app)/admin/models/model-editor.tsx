@@ -8,8 +8,11 @@
 // field to ModelInput in app/actions/models.ts, then add a <PanelSection>
 // below.
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { removeModelImage } from "@/app/actions/images";
 import { deleteModel, saveModel, type ModelInput } from "@/app/actions/models";
+import { imageUrl } from "@/lib/images";
+import { uploadModelImage } from "@/lib/upload-image";
 import {
   AVAILABILITY_LABELS,
   USUAL_SCALES,
@@ -47,6 +50,7 @@ export function ModelEditor({
   onDeleted,
   onCancel,
   onDirtyChange,
+  onImageChanged,
 }: {
   model: AdminModel | null; // null = adding a new model
   categories: Category[]; // already sorted by name
@@ -55,6 +59,7 @@ export function ModelEditor({
   onDeleted: (model: AdminModel) => void;
   onCancel: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  onImageChanged: (modelId: string, path: string | null) => void;
 }) {
   const [original] = useState(() => inputFrom(model));
   const [values, setValues] = useState(original);
@@ -353,6 +358,12 @@ export function ModelEditor({
             </label>
           </PanelSection>
 
+          {model && (
+            <PanelSection title="Image">
+              <ImageSection model={model} onImageChanged={onImageChanged} />
+            </PanelSection>
+          )}
+
           {/* Phase 6: colour options for categories with colours (BASES) go here. */}
 
           {model && (
@@ -409,5 +420,90 @@ function PanelSection({ title, children }: { title: string; children: React.Reac
       <h3 className="mb-2 text-sm font-medium text-neutral-700">{title}</h3>
       {children}
     </section>
+  );
+}
+
+// Upload, replace or remove a model's image. Unlike the other fields this
+// saves straight away (there's no Save needed).
+function ImageSection({
+  model,
+  onImageChanged,
+}: {
+  model: AdminModel;
+  onImageChanged: (modelId: string, path: string | null) => void;
+}) {
+  const [path, setPath] = useState(model.image_path);
+  const [status, setStatus] = useState<{ kind: "idle" | "busy" | "done" } | { kind: "error"; message: string }>({ kind: "idle" });
+  const fileInput = useRef<HTMLInputElement>(null);
+  const url = imageUrl(path);
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    setStatus({ kind: "busy" });
+    const result = await uploadModelImage(model.id, file);
+    if (fileInput.current) fileInput.current.value = "";
+    if (!result.ok) {
+      setStatus({ kind: "error", message: result.error });
+      return;
+    }
+    setPath(result.path);
+    onImageChanged(model.id, result.path);
+    setStatus({ kind: "done" });
+  }
+
+  async function handleRemove() {
+    if (!window.confirm(`Remove the image for ${model.code}?`)) return;
+    setStatus({ kind: "busy" });
+    const result = await removeModelImage(model.id);
+    if (!result.ok) {
+      setStatus({ kind: "error", message: result.error });
+      return;
+    }
+    setPath(null);
+    onImageChanged(model.id, null);
+    setStatus({ kind: "done" });
+  }
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={`${model.code} ${model.name}`} className="h-full w-full object-contain" />
+        ) : (
+          <span className="text-xs text-neutral-400">No image</span>
+        )}
+      </div>
+      <div className="space-y-2 text-sm">
+        <div className="flex flex-wrap gap-2">
+          <label className={`cursor-pointer rounded-md border border-neutral-300 bg-white px-3 py-1.5 hover:bg-neutral-100 ${status.kind === "busy" ? "pointer-events-none opacity-50" : ""}`}>
+            {url ? "Replace image…" : "Upload image…"}
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => void handleFile(e.target.files?.[0])}
+            />
+          </label>
+          {url && (
+            <button
+              type="button"
+              onClick={() => void handleRemove()}
+              disabled={status.kind === "busy"}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        <p className="text-neutral-600">
+          {status.kind === "busy" && "Uploading…"}
+          {status.kind === "done" && <span className="text-green-700">Image saved ✓</span>}
+          {status.kind === "error" && <span className="text-red-700">{status.message}</span>}
+          {status.kind === "idle" && "Image changes save straight away."}
+        </p>
+      </div>
+    </div>
   );
 }

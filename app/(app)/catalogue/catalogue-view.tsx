@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import {
   compareModels,
   naturalCollator,
@@ -8,6 +8,7 @@ import {
   type CatalogueModel,
   type Category,
 } from "@/lib/catalogue";
+import { imageUrl } from "@/lib/images";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
 import {
@@ -25,6 +26,38 @@ type Row = CatalogueModel & { categoryName: string };
 type Slot = { key: string; line: RequestLine | null; scale: string | null };
 
 const ALL = "all";
+
+// ---- List / grid choice, remembered in this browser ----------------------
+type ViewMode = "list" | "grid";
+const VIEW_KEY = "catalogue-view";
+const viewListeners = new Set<() => void>();
+
+function readView(): ViewMode {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "grid" ? "grid" : "list";
+  } catch {
+    return "list"; // storage blocked (e.g. private window)
+  }
+}
+
+function saveView(mode: ViewMode) {
+  try {
+    localStorage.setItem(VIEW_KEY, mode);
+  } catch {
+    // Not remembered, but the switch still works for this visit.
+  }
+  viewListeners.forEach((notify) => notify());
+}
+
+function subscribeView(notify: () => void) {
+  viewListeners.add(notify);
+  return () => viewListeners.delete(notify);
+}
+
+// The server always renders the list; the browser then switches if needed.
+function useViewMode() {
+  return useSyncExternalStore(subscribeView, readView, () => "list" as ViewMode);
+}
 
 function slotsFromLines(lines: RequestLine[]) {
   const map: Record<string, Slot[]> = {};
@@ -55,6 +88,7 @@ export function CatalogueView({
   const [query, setQuery] = useState("");
   // Shows only models with a request line, whoever asked for it.
   const [requestedOnly, setRequestedOnly] = useState(false);
+  const view = useViewMode();
 
   // Request slots per model, starting from the saved lines.
   const [slotsByModel, setSlotsByModel] = useState(() => slotsFromLines(lines));
@@ -173,6 +207,21 @@ export function CatalogueView({
           />
           Show all current requests
         </label>
+        <div role="group" aria-label="View" className="flex overflow-hidden rounded-md border border-neutral-300 text-sm">
+          {(["list", "grid"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={view === mode}
+              onClick={() => saveView(mode)}
+              className={`px-3.5 py-2 ${
+                view === mode ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 hover:bg-neutral-100"
+              }`}
+            >
+              {mode === "list" ? "List" : "Grid"}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div role="tablist" aria-label="Categories" className="mb-4 flex flex-wrap gap-2">
@@ -213,6 +262,20 @@ export function CatalogueView({
             ? "Nothing has been requested in this view yet."
             : `Nothing matches “${query}”.`}
         </p>
+      ) : view === "grid" ? (
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {visible.map((r) => (
+            <ModelCard
+              key={r.id}
+              model={r}
+              slots={slotsByModel[r.id]}
+              version={synced.version}
+              onSaved={handleSaved}
+              onRemoved={handleRemoved}
+              onAddSize={handleAddSize}
+            />
+          ))}
+        </ul>
       ) : (
         <div className="border-t border-neutral-200">
           {/* Column headings (laptop/desktop only) */}
@@ -274,29 +337,24 @@ function TabButton({
   );
 }
 
-// memo: a row only re-renders when its own slots change, which keeps
-// typing smooth with hundreds of rows on screen.
-const ModelRow = memo(function ModelRow({
-  model,
-  slots: storedSlots,
-  version,
-  onSaved,
-  onRemoved,
-  onAddSize,
-}: {
-  model: Row;
-  slots: Slot[] | undefined;
-  version: number;
+type SlotCallbacks = {
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
   onAddSize: (modelId: string, scale: string | null) => void;
-}) {
-  const slots = storedSlots?.length ? storedSlots : [blankSlot(model.id)];
+};
+
+type ModelItemProps = SlotCallbacks & {
+  model: Row;
+  slots: Slot[] | undefined;
+  version: number;
+};
+
+// memo: a row only re-renders when its own slots change, which keeps
+// typing smooth with hundreds of rows on screen.
+const ModelRow = memo(function ModelRow({ model, slots, version, ...callbacks }: ModelItemProps) {
   const comingSoon = model.availability === "coming_soon";
-  const options = scaleOptions(model);
-  const hasSizes = options.length > 1;
-  const usedScales = slots.map((s) => s.line?.scale ?? s.scale);
-  const unusedScale = options.find((o) => !usedScales.includes(o));
+  const url = imageUrl(model.image_path);
+  const [previewing, setPreviewing] = useState(false);
 
   return (
     <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 lg:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] lg:items-start lg:gap-4 lg:py-3">
@@ -305,49 +363,142 @@ const ModelRow = memo(function ModelRow({
         {model.code}
       </span>
 
-      <div className={`min-w-0 lg:pt-2 ${comingSoon ? "text-neutral-400" : ""}`}>
-        <span className="break-words">{model.name}</span>
-        {showNewBadge(model) && (
-          <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-800">
-            NEW
-          </span>
+      {/* Hovering the name shows the image (only loaded when needed). */}
+      <div
+        className="relative min-w-0 lg:pt-2"
+        onMouseEnter={() => url && setPreviewing(true)}
+        onMouseLeave={() => setPreviewing(false)}
+      >
+        <ModelInfo model={model} hasImage={Boolean(url)} />
+        {previewing && url && (
+          <div className="pointer-events-none absolute top-full left-0 z-20 mt-1 hidden h-72 w-72 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg lg:block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" className="h-full w-full object-contain" />
+          </div>
         )}
-        {comingSoon && (
-          <span className="ml-2 rounded border border-neutral-300 px-1.5 py-0.5 align-middle text-xs text-neutral-500 italic">
-            On its way
-          </span>
-        )}
-        <span className="block text-xs text-neutral-500">{model.categoryName}</span>
       </div>
 
       {/* On phones and tablets the controls sit under the name. */}
-      <div className="col-span-2 space-y-2 lg:col-span-1">
-        {slots.map((slot, i) => (
-          <LineEditor
-            key={`${slot.key}@${version}`}
-            model={model}
-            slot={slot}
-            hasSizes={hasSizes}
-            options={options}
-            takenScales={usedScales.filter((_, j) => j !== i)}
-            onSaved={onSaved}
-            onRemoved={onRemoved}
-            canRemove={i > 0 && !slot.line}
-          />
-        ))}
-        {hasSizes && unusedScale !== undefined && (
-          <button
-            type="button"
-            onClick={() => onAddSize(model.id, unusedScale)}
-            className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
-          >
-            + another size
-          </button>
-        )}
+      <div className="col-span-2 lg:col-span-1">
+        <RequestSlots model={model} slots={slots} version={version} compact={false} {...callbacks} />
       </div>
     </li>
   );
 });
+
+// Grid view: one card per model, image on top, controls underneath.
+const ModelCard = memo(function ModelCard({ model, slots, version, ...callbacks }: ModelItemProps) {
+  const url = imageUrl(model.image_path);
+  const comingSoon = model.availability === "coming_soon";
+
+  return (
+    <li className="flex flex-col rounded-lg border border-neutral-200 bg-white">
+      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-t-lg border-b border-neutral-100 bg-white">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={url}
+            alt={`${model.code} ${model.name}`}
+            loading="lazy"
+            className={`h-full w-full object-contain ${comingSoon ? "opacity-50" : ""}`}
+          />
+        ) : (
+          <span className="text-sm text-neutral-400">No image yet</span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-3 p-3">
+        <div>
+          <span className={`font-mono text-sm ${comingSoon ? "text-neutral-400" : "text-neutral-600"}`}>
+            {model.code}
+          </span>
+          <ModelInfo model={model} hasImage={false} />
+        </div>
+        <RequestSlots model={model} slots={slots} version={version} compact {...callbacks} />
+      </div>
+    </li>
+  );
+});
+
+// Name, badges and category.
+function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
+  const comingSoon = model.availability === "coming_soon";
+  return (
+    <div className={comingSoon ? "text-neutral-400" : ""}>
+      <span className="break-words">{model.name}</span>
+      {hasImage && (
+        <span className="ml-1.5 align-middle text-neutral-400" title="Hover to see the image">
+          <ImageIcon />
+        </span>
+      )}
+      {showNewBadge(model) && (
+        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-800">
+          NEW
+        </span>
+      )}
+      {comingSoon && (
+        <span className="ml-2 rounded border border-neutral-300 px-1.5 py-0.5 align-middle text-xs text-neutral-500 italic">
+          On its way
+        </span>
+      )}
+      <span className="block text-xs text-neutral-500">{model.categoryName}</span>
+    </div>
+  );
+}
+
+function ImageIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden className="inline">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" />
+      <circle cx="5.5" cy="6" r="1.2" fill="currentColor" />
+      <path d="M2 12l4-4 3 3 2-2 3 3" fill="none" stroke="currentColor" />
+    </svg>
+  );
+}
+
+// All the request lines for one model, plus "+ another size".
+function RequestSlots({
+  model,
+  slots: storedSlots,
+  version,
+  compact,
+  onSaved,
+  onRemoved,
+  onAddSize,
+}: ModelItemProps & { compact: boolean }) {
+  const slots = storedSlots?.length ? storedSlots : [blankSlot(model.id)];
+  const options = scaleOptions(model);
+  const hasSizes = options.length > 1;
+  const usedScales = slots.map((s) => s.line?.scale ?? s.scale);
+  const unusedScale = options.find((o) => !usedScales.includes(o));
+
+  return (
+    <div className="space-y-2">
+      {slots.map((slot, i) => (
+        <LineEditor
+          key={`${slot.key}@${version}`}
+          model={model}
+          slot={slot}
+          hasSizes={hasSizes}
+          options={options}
+          takenScales={usedScales.filter((_, j) => j !== i)}
+          onSaved={onSaved}
+          onRemoved={onRemoved}
+          canRemove={i > 0 && !slot.line}
+          compact={compact}
+        />
+      ))}
+      {hasSizes && unusedScale !== undefined && (
+        <button
+          type="button"
+          onClick={() => onAddSize(model.id, unusedScale)}
+          className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
+        >
+          + another size
+        </button>
+      )}
+    </div>
+  );
+}
 
 function LineEditor({
   model,
@@ -358,6 +509,7 @@ function LineEditor({
   onSaved,
   onRemoved,
   canRemove,
+  compact,
 }: {
   model: Row;
   slot: Slot;
@@ -367,6 +519,7 @@ function LineEditor({
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
   canRemove: boolean; // an extra, unsaved size line can be removed
+  compact: boolean; // true in grid cards: always the stacked layout
 }) {
   const { fields, status, update, commit, retry } = useLineAutosave({
     modelId: model.id,
@@ -379,10 +532,16 @@ function LineEditor({
   const what = `${model.code} ${model.name}`;
   // Keep a saved size selectable even if it's no longer in the model's list.
   const sizeOptions = options.includes(fields.scale) ? options : [...options, fields.scale];
+  // On wide screens the list view puts everything on one line.
+  const wide = compact ? "" : "lg:col-span-1";
 
   return (
-    <div className="grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 lg:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]">
-      <div className="col-span-3 text-sm text-neutral-600 lg:col-span-1 lg:order-none">
+    <div
+      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 ${
+        compact ? "" : "lg:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]"
+      }`}
+    >
+      <div className={`col-span-3 text-sm text-neutral-600 ${wide}`}>
         {hasSizes ? (
           <ScaleSelect
             label={`Size for ${what}`}
@@ -393,8 +552,8 @@ function LineEditor({
             onChange={(v) => update("scale", v, "now")}
           />
         ) : (
-          <span className="lg:pl-1">
-            <span className="text-neutral-400 lg:hidden">Size: </span>
+          <span className={compact ? "" : "lg:pl-1"}>
+            <span className={`text-neutral-400 ${compact ? "" : "lg:hidden"}`}>Size: </span>
             {scaleLabel(fields.scale, model.default_scale)}
           </span>
         )}
@@ -410,7 +569,7 @@ function LineEditor({
         value={fields.urgency}
         onChange={(v) => update("urgency", v, "now")}
       />
-      <div className="col-span-3 lg:col-span-1">
+      <div className={`col-span-3 ${wide}`}>
         <NoteInput
           label={`Note for ${what}`}
           value={fields.note}
@@ -418,7 +577,7 @@ function LineEditor({
           onBlur={commit}
         />
       </div>
-      <div className="col-span-3 min-h-5 text-sm lg:col-span-1">
+      <div className={`col-span-3 min-h-5 text-sm ${wide}`}>
         <SaveStatusText status={status} onRetry={retry} />
         {canRemove && status.kind !== "saving" && (
           <button

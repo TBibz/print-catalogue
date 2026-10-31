@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +11,12 @@ export const metadata: Metadata = { title: "Models · Print Catalogue" };
 export default function ModelsPage() {
   return (
     <>
-      <h1 className="mb-4 text-2xl font-semibold">Models</h1>
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Models</h1>
+        <Link href="/admin/upload" className="text-sm text-neutral-700 underline hover:no-underline">
+          Upload images in bulk
+        </Link>
+      </div>
       <Suspense fallback={<p className="text-neutral-500">Loading models…</p>}>
         <ModelsData />
       </Suspense>

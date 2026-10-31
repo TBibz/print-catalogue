@@ -5,6 +5,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ADMIN_MODEL_COLUMNS, type AdminModel, type Availability } from "@/lib/catalogue";
+import { IMAGE_BUCKET } from "@/lib/images";
 
 export type ModelInput = {
   id: string | null; // null = a new model
@@ -109,8 +110,8 @@ export async function deleteModel(id: string): Promise<DeleteModelResult> {
     .from("models")
     .delete()
     .eq("id", id)
-    .select("id")
-    .maybeSingle();
+    .select("id, image_path")
+    .maybeSingle<{ id: string; image_path: string | null }>();
 
   if (error) {
     console.error("models delete:", error.message);
@@ -125,5 +126,13 @@ export async function deleteModel(id: string): Promise<DeleteModelResult> {
     return { ok: false, error: "Couldn't delete. Please check your connection and try again." };
   }
   if (!data) return { ok: false, error: "This model was already deleted. Refresh the page." };
+
+  // Remove its image file too (not fatal if this fails).
+  if (data.image_path) {
+    const { error: removeError } = await supabase.storage
+      .from(IMAGE_BUCKET)
+      .remove([data.image_path]);
+    if (removeError) console.error("image remove:", removeError.message);
+  }
   return { ok: true };
 }
