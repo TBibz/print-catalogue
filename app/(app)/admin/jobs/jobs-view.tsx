@@ -77,7 +77,11 @@ export function JobsView({
     setOpen(null);
   }
 
-  const printerName = (id: string) => options.printers.find((p) => p.id === id)?.name ?? "—";
+  // The printer's name with a stripe of its colour.
+  const printerLabel = (id: string) => {
+    const p = options.printers.find((x) => x.id === id);
+    return p ? <ColourLabel hex={p.colour_hex} name={p.name} /> : "—";
+  };
   const sortedHistory = [...history].sort((a, b) => finishedAt(b).localeCompare(finishedAt(a)));
 
   const toggle = (jobId: string, mode: NonNullable<Open>["mode"]) => {
@@ -111,7 +115,7 @@ export function JobsView({
               const mode = open?.jobId === job.id ? open.mode : null;
               return (
                 <li key={job.id} className="rounded-lg border border-neutral-200 p-4">
-                  <JobSummary job={job} printerName={printerName(job.printer_id)} options={options} />
+                  <JobSummary job={job} printerLabel={printerLabel(job.printer_id)} options={options} />
                   <div className="mt-3 flex flex-wrap gap-2">
                     <ActionButton primary active={mode === "complete"} onClick={() => toggle(job.id, "complete")}>
                       Complete
@@ -201,7 +205,7 @@ export function JobsView({
                     >
                       <span className="text-sm">{formatDate(finishedAt(job))}</span>
                       <span className="col-start-1 text-sm text-neutral-600 md:col-start-auto">
-                        {printerName(job.printer_id)}
+                        {printerLabel(job.printer_id)}
                       </span>
                       <span className="col-start-1 min-w-0 md:col-start-auto">
                         {job.title && <span className="block font-medium">{job.title}</span>}
@@ -245,7 +249,7 @@ export function JobsView({
 
                     {isOpen && (
                       <div className="mx-3 mb-4 rounded-lg border border-neutral-200 bg-white p-4">
-                        <JobSummary job={job} printerName={printerName(job.printer_id)} options={options} />
+                        <JobSummary job={job} printerLabel={printerLabel(job.printer_id)} options={options} />
                         <div className="mt-3 flex flex-wrap gap-2">
                           <ActionButton active={mode === "details"} onClick={() => toggle(job.id, "details")}>
                             Edit details
@@ -338,7 +342,15 @@ function ItemColour({ item, options }: { item: JobItem; options: JobFormOptions 
 const jobName = (job: Job) => job.title || `the job started ${formatDate(job.started_at)}`;
 
 // Everything about one job, read-only.
-function JobSummary({ job, printerName, options }: { job: Job; printerName: string; options: JobFormOptions }) {
+function JobSummary({
+  job,
+  printerLabel,
+  options,
+}: {
+  job: Job;
+  printerLabel: React.ReactNode; // name with its colour stripe
+  options: JobFormOptions;
+}) {
   const material = options.materials.find((m) => m.id === job.material_id);
   const facts = [
     job.est_material_ml !== null && `${Number(job.est_material_ml)} ml`,
@@ -351,8 +363,14 @@ function JobSummary({ job, printerName, options }: { job: Job; printerName: stri
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-medium">{job.title || printerName}</span>
-        {job.title && <span className="text-sm text-neutral-600">{printerName}</span>}
+        {job.title ? (
+          <>
+            <span className="font-medium">{job.title}</span>
+            <span className="text-sm">{printerLabel}</span>
+          </>
+        ) : (
+          <span className="font-medium">{printerLabel}</span>
+        )}
         <span className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_STYLES[job.status]}`}>
           {STATUS_LABELS[job.status]}
         </span>

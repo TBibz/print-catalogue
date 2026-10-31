@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { deletePrinter, savePrinter, type PrinterInput } from "@/app/actions/materials";
 import { TYPE_LABELS, type MaterialType, type Printer } from "@/lib/materials";
+import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
+import { ColourLabel } from "@/components/colour-label";
+import { ColourPicker } from "@/components/colour-picker";
 
 const GRID = "md:grid-cols-[minmax(0,1fr)_9rem_8rem_6rem]";
 const box =
@@ -82,7 +85,9 @@ export function PrintersList({ printers: serverPrinters }: { printers: Printer[]
                   p.active ? "" : "text-neutral-400"
                 }`}
               >
-                <span>{p.name}</span>
+                <span>
+                  <ColourLabel hex={p.colour_hex} name={p.name} />
+                </span>
                 <span className="col-start-1 text-sm text-neutral-600 md:col-start-auto">
                   {TYPE_LABELS[p.type]}
                 </span>
@@ -127,6 +132,7 @@ function PrinterEditor({
     name: printer?.name ?? "",
     type: printer?.type ?? "fdm",
     active: printer?.active ?? true,
+    colourHex: printer?.colour_hex ?? DEFAULT_COLOUR_HEX,
   });
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -168,14 +174,21 @@ function PrinterEditor({
             <label htmlFor="printer-name" className={fieldLabel}>
               Name
             </label>
-            <input
-              id="printer-name"
-              value={values.name}
-              onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-              autoComplete="off"
-              autoFocus={!printer}
-              className={box}
-            />
+            <div className="flex gap-2">
+              <ColourPicker
+                label="Printer colour"
+                value={values.colourHex}
+                onChange={(hex) => setValues((v) => ({ ...v, colourHex: hex }))}
+              />
+              <input
+                id="printer-name"
+                value={values.name}
+                onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+                autoComplete="off"
+                autoFocus={!printer}
+                className={box}
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="printer-type" className={fieldLabel}>

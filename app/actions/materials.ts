@@ -33,7 +33,13 @@ function friendly(error: { code?: string; message: string }, what: string): Fail
 
 // ---- Printers ---------------------------------------------------------------
 
-export type PrinterInput = { id: string | null; name: string; type: MaterialType; active: boolean };
+export type PrinterInput = {
+  id: string | null;
+  name: string;
+  type: MaterialType;
+  active: boolean;
+  colourHex: string; // "#rrggbb"
+};
 
 export async function savePrinter(input: PrinterInput): Promise<{ ok: true; printer: Printer } | Fail> {
   await requireAdmin();
@@ -41,9 +47,11 @@ export async function savePrinter(input: PrinterInput): Promise<{ ok: true; prin
   if (!name) return { ok: false, field: "name", error: "Please enter a name." };
   if (name.length > 100) return { ok: false, field: "name", error: "Names can be at most 100 characters." };
   if (!TYPES.includes(input.type)) return { ok: false, field: "type", error: "Please choose a type." };
+  const colourHex = String(input.colourHex ?? "").toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(colourHex)) return { ok: false, field: "colourHex", error: "Pick a colour." };
 
   const supabase = await createClient();
-  const values = { name, type: input.type, active: Boolean(input.active) };
+  const values = { name, type: input.type, active: Boolean(input.active), colour_hex: colourHex };
   const query = input.id
     ? supabase.from("printers").update(values).eq("id", input.id)
     : supabase.from("printers").insert(values);

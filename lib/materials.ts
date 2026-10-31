@@ -20,10 +20,11 @@ export type Printer = {
   name: string;
   type: MaterialType;
   active: boolean;
+  colour_hex: string; // shown in Start print and on the Jobs page
   created_at: string;
 };
 
-export const PRINTER_COLUMNS = "id, name, type, active, created_at";
+export const PRINTER_COLUMNS = "id, name, type, active, colour_hex, created_at";
 
 export type Material = {
   id: string;

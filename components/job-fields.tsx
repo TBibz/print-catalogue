@@ -5,6 +5,8 @@
 // fields for that printer type are shown (brief section 4).
 import { formatMoney, formatMoneyInput } from "@/lib/money";
 import { MoneyInput } from "@/components/money-input";
+import { ColourStripe } from "@/components/colour-label";
+import { tint } from "@/lib/colours";
 import { calculateMoney, type JobForm, type JobFormOptions } from "@/lib/jobs";
 import { TYPE_LABELS } from "@/lib/materials";
 
@@ -50,11 +52,13 @@ export function JobFields({
         <legend className="mb-2 font-medium">Printer</legend>
         <div className="flex flex-wrap gap-2">
           {printers.map((p) => (
+            // The printer's colour as a stripe, and a light tint of it once chosen.
             <label
               key={p.id}
+              style={form.printerId === p.id ? { backgroundColor: tint(p.colour_hex) } : undefined}
               className={`flex cursor-pointer items-center gap-2 rounded-md border px-3.5 py-2.5 ${
                 form.printerId === p.id
-                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  ? "border-neutral-900 font-medium ring-1 ring-neutral-900"
                   : "border-neutral-300 hover:bg-neutral-100"
               }`}
             >
@@ -66,10 +70,9 @@ export function JobFields({
                 onChange={() => choosePrinter(p.id)}
                 className="sr-only"
               />
+              <ColourStripe hex={p.colour_hex} />
               {p.name}
-              <span className={`text-xs ${form.printerId === p.id ? "text-neutral-300" : "text-neutral-500"}`}>
-                {TYPE_LABELS[p.type]}
-              </span>
+              <span className="text-xs font-normal text-neutral-500">{TYPE_LABELS[p.type]}</span>
             </label>
           ))}
           {printers.length === 0 && (
