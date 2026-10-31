@@ -132,6 +132,11 @@ _Last updated: 2026-10-31 (sticky headings, auto-hiding nav)_
 - `categories`: "admin write" (which also covered reading) split into admin insert / update / delete, so "read" is the only SELECT policy
 - Checked in PGlite: all five functions return exactly what the views did, for both admin and Dad; logged-out users can't call them; category, notepad and profile rules behave as before; safe to run twice
 
+### Security Advisor warnings, part 2: Done (SQL only, no app code changes)
+- Checked every `security definer` function: the seven job RPCs stop first thing via `pj_require_admin()`, `set_category_default_scale` checks `is_admin()` straight after `begin`; helpers and trigger functions can't be called by `public`, `anon` or `authenticated`; `is_admin()` and the five `0016` functions are meant for any logged-in user. With Supabase's "everyone can run new functions" default reproduced in PGlite, no function can be run by `public` or `anon`. Nothing was missing
+- `0017_request_lines_policies.sql`: request_lines insert / update / delete (already `to authenticated`) now check for a profile with role admin or requester instead of `true`; reading stays `true` (not flagged). Re-revokes the admin RPCs from `public` / `anon` as a safety net
+- Checked in PGlite: Tomi and Dad can still add, change and delete request lines; a login without a profile can't; Dad gets "Only the admin…" from every admin function; function rights identical before and after; safe to run twice
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -154,6 +159,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0014_category_printer_colours.sql` | 8 | `colour_hex` on categories and printers | ☐ |
 | `0015_bulk_default_scale.sql` | 8 | `set_category_default_scale()` | ☐ |
 | `0016_security_advisor.sql` | 8 | the five requester views become functions, `rls_auto_enable()` locked down, faster policies, categories policies split | ☐ |
+| `0017_request_lines_policies.sql` | 8 | request_lines write policies check for an admin/requester profile instead of `true`; admin RPCs re-revoked from public/anon | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 

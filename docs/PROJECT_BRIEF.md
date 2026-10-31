@@ -35,6 +35,7 @@ Only these two users. No public sign-up.
 - A `profiles` table links each auth user to a role. Provide an SQL helper `is_admin()` used by RLS policies.
 - Admin-only columns (e.g. `models.admin_notes`) are exposed to the requester only through a `security definer` function that returns the safe columns (`catalogue_models()` for models without `admin_notes`). No `security definer` views (Supabase's Security Advisor flags them). Such functions use `set search_path = ''`, are revoked from `public` and `anon`, and granted to `authenticated`.
 - RLS policies wrap `auth.uid()` and `is_admin()` in `(select …)` so they run once per query, and each table has at most one permissive policy per action.
+- Admin-only `security definer` functions raise an error first thing unless `is_admin()` is true, and can't be run by `public` or `anon`. Policies avoid a bare `true` for writes: request lines can be changed by anyone with an admin or requester profile.
 
 ## 4. Data model (target design)
 
