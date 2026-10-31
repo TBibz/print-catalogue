@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (Phase 7: money and stats)_
+_Last updated: 2026-10-31 (Phase 8: future-proofing and polish)_
 
 ## Phases
 
@@ -17,7 +17,7 @@ _Last updated: 2026-10-31 (Phase 7: money and stats)_
 | 6a | Print jobs | Done (needs `0008` run, then testing) |
 | 6b | Colours, categories page, notepad count | Done (needs `0010` run, then testing) |
 | 7 | Money and stats | Done (needs `0012` run, then testing) |
-| 8 | Polish | **Not started (next)** |
+| 8 | Future-proofing and polish | Done (needs `0013`–`0015` run, then testing); custom domain still to do |
 
 ### 1. Foundations: Done
 - Next.js 16 app, Supabase email/password login, sign out, proxy guarding every page except `/login`
@@ -91,7 +91,18 @@ _Last updated: 2026-10-31 (Phase 7: money and stats)_
 - `/admin/money` ("Money" in the header): running total, Starting balance (opening balance + first month), table newest first with autosaving Payments and Costs, "Materials from jobs" reference, coloured differences, all-time stats per printer and top 10 models
 - Money formatting everywhere (`lib/money.ts`): "£1,234.56", "−£12.34"; £ boxes (`components/money-input.tsx`) with a fixed £ that accept "12", "12.5", "1,200". Used on Money, Jobs, the Start print panel (est. cost, my cost, charge) and Materials (pack price, charge)
 - The page layout was checked with sample data in the browser pane (desktop and phone), using a temporary preview page that wasn't committed
-### 8. Polish: Not started
+### 8. Future-proofing and polish: Done (one commit per item)
+1. **Row limit** (79e84c4): `lib/fetch-all.ts` reads page by page until an empty page, so it works whatever Supabase's Max rows is (the old helper stopped early below 1,000). Reads changed: categories, catalogue models, admin models (models + upload pages), request lines, printing amounts, print totals, colour options, printers, materials (job form + Materials page), settings page, notepad lines, printing jobs, job history (capped at 200 with "Showing latest 200 of N" and the total in the heading), `money_by_month()`, `print_stats_by_printer()`, and the import script's categories and models. Counts: `0013_category_counts.sql` (`category_model_counts`) feeds the catalogue sidebar and the Categories page. Left as they are (single rows, deliberate limits or counts already in the database): the logged-in profile, single-row saves, the newest category's position, top 10 models, the two money settings, the unticked notepad count. Rule added to CLAUDE.md
+2. **Compact rows** (e90af39): 34px controls, 14px text, tighter padding; category on the name's line
+3. **Alternating rows** (da45329): very light grey on every other row in the catalogue list and queue
+4. **"Not ready"** (a442383): replaces "Model Not Ready", never wraps
+5. **Gold NEW rows** (f001b23): light gold row / card for NEW models, over the alternating grey
+6. **Category colours** (fa8ec38): `0014_category_printer_colours.sql`; colour picker on Categories; sidebar fills the selected category with its colour (dark or white text by contrast), stripes on the others, "All" black. Shared `ColourPicker` (also used by Materials)
+7. **Printer colours** (171cf11): colour picker on Printers; stripe + tint in Start print; stripe next to printer names on Jobs
+8. **All succeeded / All failed** (605ea0f): they now fill every item and submit straight away (before, "All succeeded" re-filled the amounts already there, so nothing seemed to happen, and neither saved anything)
+9. **Bulk default scale** (c849c1d): `0015_bulk_default_scale.sql` (`set_category_default_scale()`, with a dry run for the count); "Set scale…" panel on Categories
+10. **Home-screen app** (fdde534): `public/manifest.webmanifest`, icons generated with next/og, Apple web-app tags; proxy.ts skips `.webmanifest` so the manifest loads without logging in
+- SQL for items 1, 6–7 and 9 was checked in PGlite. Items 2–5 were checked in the browser pane with sample data (temporary preview page, not committed). The manifest and icons were checked against a local production server (they load without logging in; pages still need login)
 
 ## Migrations
 
@@ -111,6 +122,9 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0010_colours.sql` | 6b | colours on request lines and job items, `colour_options` view, colour checks, BASES colours | ☐ |
 | `0011_colour_hex_category_order.sql` | 6b | `materials.colour_hex`, `colour_options` with hex and out-of-stock colours, category positions, `reorder_categories()` | ☐ |
 | `0012_money.sql` | 7 | `monthly_money`, money settings, `money_by_month()`, `print_stats_by_printer()` | ☐ |
+| `0013_category_counts.sql` | 8 | `category_model_counts` view | ☐ |
+| `0014_category_printer_colours.sql` | 8 | `colour_hex` on categories and printers | ☐ |
+| `0015_bulk_default_scale.sql` | 8 | `set_category_default_scale()` | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -125,6 +139,8 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - None of the Phase 6a/6b screens or UI fixes have been checked in a browser yet (Claude can't log in). Lint and the build pass.
 - Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
 - Drag-and-drop on the Categories page needs a mouse; on a phone or tablet use the ↑ ↓ buttons.
+- Custom domain (Phase 8) not done: it's set up in Vercel and your domain registrar, not in code.
+- The catalogue's name column is narrow at 1280px (long names wrap onto two lines) because the controls take most of the row.
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 - Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
 

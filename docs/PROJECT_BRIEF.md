@@ -23,7 +23,8 @@ Only these two users. No public sign-up.
 - Multi-step data changes that must happen together (e.g. completing a print job) are Postgres functions called via RPC, not several separate client calls.
 - UK English in the UI. Currency is GBP (£).
 - Money everywhere is shown as "£1,234.56" (two decimals, thousands separators) and negatives as "−£12.34" (`formatMoney` in `lib/money.ts`). Money boxes have a fixed "£" inside on the left; only the number is typed, and "12", "12.5" and "1,200" are all accepted (`components/money-input.tsx`). Amounts are stored pence-accurate (`numeric(…, 2)`).
-- **Desktop/laptop first**, but layouts must still work on a phone.
+- **Desktop/laptop first**, but layouts must still work on a phone. Installable as a home-screen / dock app ("Print Catalogue", `public/manifest.webmanifest`, opens without browser bars).
+- **Reads never get silently cut off:** Supabase returns at most "Max rows" rows per request. Lists are read with `fetchAll()` (`lib/fetch-all.ts`) in pages with a stable order; counts and totals come from the database (e.g. `category_model_counts`); a deliberate cap says so ("Showing latest 200 of N"). See CLAUDE.md.
 - Clean, minimal look: white/light background (model renders are on pure white), clear typography, no clutter. Large enough click targets for an older user.
 - Tomi is a beginner coder. Keep code readable, add short comments on non-obvious logic, and always finish a task with a plain-English checklist of anything Tomi must do by hand.
 
@@ -43,7 +44,9 @@ Build tables only when their phase is reached. Names and fields below are the ta
 - A trigger creates a profile (role `requester` by default) when an auth user is created.
 
 ### categories
-- `id`, `name` (unique, e.g. "STAR WARS"), `sort_order` (int: the category's position, 1 = first; set by drag-and-drop on the Categories page and saved with `reorder_categories()`; new categories go last), `has_colour_options` (bool, default false; `0010_colours.sql` sets it for BASES)
+- `id`, `name` (unique, e.g. "STAR WARS"), `sort_order` (int: the category's position, 1 = first; set by drag-and-drop on the Categories page and saved with `reorder_categories()`; new categories go last), `has_colour_options` (bool, default false; `0010_colours.sql` sets it for BASES), `colour_hex` (default grey; highlights the category in the catalogue sidebar)
+- `category_model_counts` view: total and visible (not retired) models per category, for the sidebar and Categories page.
+- `set_category_default_scale(category, scale, only_unset, add_scales, dry_run)`: sets the default scale on a category's models (only those with none, or all), optionally adding other sizes; the dry run returns how many would change.
 
 ### models
 - `id`, `code` (unique, text, e.g. "SW001", "Base001", "WW2 001", "DN020a", "DN005a+b")
@@ -71,7 +74,7 @@ One row per model + option combination that Dad currently wants.
 - Nobody can set the quantity below the amount currently printing for that line, delete a line that is printing, or change its size. A database trigger enforces this (`request_lines_printing_guard`), and the UI shows the same message.
 
 ### printers (Phase 5)
-- `id`, `name` ("Saturn 4 Ultra", "Centauri Carbon"), `type` (`resin` | `fdm`), `active`
+- `id`, `name` ("Saturn 4 Ultra", "Centauri Carbon"), `type` (`resin` | `fdm`), `active`, `colour_hex` (default grey; shown as a stripe in Start print and on Jobs)
 
 ### materials (Phase 5)
 The material stock index. It replaces the price table in "Centauri Prints" (cols I–M) and the "Resins" tab.
@@ -155,7 +158,7 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 **Printed total per model** = sum of `quantity_succeeded` on items in completed jobs.
 
-**NEW badge:** shown if `show_new_badge` is true and printed total < 4. It turns off automatically after 4 successful prints. Imported models start with it off unless flagged.
+**NEW badge:** shown if `show_new_badge` is true and printed total < 4. NEW models' catalogue rows and grid cards also get a light gold background (over the alternating grey). It turns off automatically after 4 successful prints. Imported models start with it off unless flagged.
 
 **Charges (Phase 6)**
 - Resin job: `charge` = est_weight_g ÷ resin_charge_divisor (15). `my_cost` = the `est_cost` typed in from the slicer.
@@ -164,26 +167,26 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 ## 6. Pages
 
-Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 80rem (`max-w-7xl`) wide.
+Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 80rem (`max-w-7xl`) wide.
 
 **Colours are shown one way everywhere** (`components/colour-label.tsx`): a solid 6px vertical stripe of the material's `colour_hex`, full text height with slightly rounded corners, immediately left of the colour name in normal dark text. Very light colours (worked out from the hex's luminance) get a thin grey outline. "Any colour" has no stripe. In the catalogue's colour dropdown the chosen colour's stripe sits inside the box, left of the name.
 
-Request controls (quantity, urgency, note, size, colour) are all the same height (44px) wherever they appear.
+Request controls (quantity, urgency, note, size, colour, plate) are all 34px high with 14px text, for spreadsheet-like density. Catalogue list and queue rows alternate white / very light grey.
 
 Everyone:
 - `/login`
-- `/catalogue`: categories in a left-hand sidebar (All + each category, with model counts; a category dropdown above the list below 1024px wide), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Models in a category with colour options get a colour dropdown ("Any colour" plus every filament offered as a colour; out-of-stock ones are greyed out, marked "(out of stock)" and can't be chosen, but a line already using one keeps showing it) and "+ another colour" for another line in a different colour. Size and colour are locked while some are printing. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing". From 1280px wide each list row is on one line (Note is the widest control; "Saved ✓" shows inside the Note box, other messages on a line underneath); narrower, the controls sit under the name.
+- `/catalogue`: categories in a left-hand sidebar (All + each category, with model counts from the database; the selected category is filled with its colour, text dark or white for contrast, "All" black; unselected ones show a stripe of their colour; a category dropdown above the list below 1024px wide), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Models in a category with colour options get a colour dropdown ("Any colour" plus every filament offered as a colour; out-of-stock ones are greyed out, marked "(out of stock)" and can't be chosen, but a line already using one keeps showing it) and "+ another colour" for another line in a different colour. Size and colour are locked while some are printing. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing". From 1280px wide each list row is on one line (Note is the widest control; "Saved ✓" shows inside the Note box, other messages on a line underneath); narrower, the controls sit under the name.
 - `/notepad`: handwritten-style font sitting straight on the plain white page (no card, paper or ruled lines), bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
 
 Admin only:
 - `/admin/queue`: all request lines sorted by the queue rule, with "N requested · M printing". Tick lines, set how many go on this plate (default = what's left to print), add catalogue models (search) or free-text items, choose printer, see my cost and charge live, "Start print". Colour items show their colour stripe and name; on a filament printer, if every coloured item on the plate is the same colour, that filament is pre-selected (still changeable). Shows "N unticked notepad notes" at the top, linking to /notepad.
-- `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item and All succeeded / All failed shortcuts, Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert. Any job (printing, completed or cancelled) can be deleted for good, after an in-page confirmation.
+- `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item, or "All succeeded" / "All failed", which apply straight away; Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200, with "Showing latest 200 of N" when there are more), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert. Any job (printing, completed or cancelled) can be deleted for good, after an in-page confirmation.
 - `/admin/models` also shows each model's printed total.
 - `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it.
 - `/admin/upload`: bulk image upload; match file name to `code_key`, create new models for unknown codes (choose a category for the batch), ask before replacing an existing image.
-- `/admin/categories`: each category with its model count; drag-and-drop order (⠿ handle, plus ↑ ↓ buttons), saved immediately; rename, colour options, add; delete only when it has no models.
+- `/admin/categories`: each category with its model count; drag-and-drop order (⠿ handle, plus ↑ ↓ buttons), saved immediately; rename, colour (picker), colour options, add; delete only when it has no models; "Set scale…" opens an in-page panel to set the default scale in bulk (shows how many models will change before confirming).
 - `/admin/materials`: each material shows its colour stripe; adding or editing uses a native colour picker for `colour_hex`.
-- `/admin/materials`, `/admin/printers`
+- `/admin/materials`, `/admin/printers` (each printer has a colour picker)
 - `/admin/money` ("Money" in the header): the running total at the top, large, red if negative, green if positive, grey at zero. A "Starting balance" section (opening balance and first month shown, saved to settings). A table, newest month first: Month ("Oct 2026"), Print jobs ("12 plates · 47 items"), Charge, Payments, Costs, Difference. Payments and Costs are £ boxes that autosave ("Saved ✓"), with "Materials from jobs: £x.xx" in grey under Costs. Difference is coloured like the total. Below: all-time stats (plates and items per printer, total charge, top 10 most printed models).
 - `/admin/settings`
 
@@ -198,7 +201,7 @@ Admin only:
    - **6a:** start print from the queue with the printer-specific form, complete/partial/cancel/edit/revert, costs and charges, printing status on the catalogue, printed totals, NEW badge auto-off.
    - **6b:** colour choice for categories with colour options such as BASES (`colour_material_id` on request lines and job items), `/admin/categories` page, unticked notepad count on the queue.
 7. **Money and stats:** monthly payments and costs, charges from completed jobs, difference and running total with an opening balance, print stats.
-8. **Polish:** installable home-screen app, custom domain, small UX fixes.
+8. **Future-proofing and polish:** no silent row limits, compact rows, alternating and gold NEW rows, "Not ready", category and printer colours, one-click job results, bulk default scale, installable home-screen app. (Custom domain still to do.)
 
 ## 8. Catalogue import (Phase 1)
 
