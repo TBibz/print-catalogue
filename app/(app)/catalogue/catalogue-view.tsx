@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
+  AVAILABILITY_LABELS,
   compareModels,
   naturalCollator,
   showNewBadge,
@@ -89,6 +90,10 @@ export function CatalogueView({
   // Shows only models with a request line, whoever asked for it.
   const [requestedOnly, setRequestedOnly] = useState(false);
   const view = useViewMode();
+  // The model whose image is shown enlarged, if any.
+  const [enlarged, setEnlarged] = useState<Row | null>(null);
+  const openImage = useCallback((model: Row) => setEnlarged(model), []);
+  const closeImage = useCallback(() => setEnlarged(null), []);
 
   // Request slots per model, starting from the saved lines.
   const [slotsByModel, setSlotsByModel] = useState(() => slotsFromLines(lines));
@@ -273,6 +278,7 @@ export function CatalogueView({
               onSaved={handleSaved}
               onRemoved={handleRemoved}
               onAddSize={handleAddSize}
+              onOpenImage={openImage}
             />
           ))}
         </ul>
@@ -300,11 +306,14 @@ export function CatalogueView({
                 onSaved={handleSaved}
                 onRemoved={handleRemoved}
                 onAddSize={handleAddSize}
+                onOpenImage={openImage}
               />
             ))}
           </ul>
         </div>
       )}
+
+      {enlarged && <ImagePopout model={enlarged} onClose={closeImage} />}
     </div>
   );
 }
@@ -349,34 +358,68 @@ type ModelItemProps = SlotCallbacks & {
   version: number;
 };
 
+type ImageProps = { onOpenImage: (model: Row) => void };
+
+const PREVIEW_SIZE = 288; // px, the hover preview box
+const PREVIEW_GAP = 20; // px between the pointer and the preview
+
 // memo: a row only re-renders when its own slots change, which keeps
 // typing smooth with hundreds of rows on screen.
-const ModelRow = memo(function ModelRow({ model, slots, version, ...callbacks }: ModelItemProps) {
+const ModelRow = memo(function ModelRow({
+  model,
+  slots,
+  version,
+  onOpenImage,
+  ...callbacks
+}: ModelItemProps & ImageProps) {
   const comingSoon = model.availability === "coming_soon";
   const url = imageUrl(model.image_path);
-  const [previewing, setPreviewing] = useState(false);
+  // Where the pointer is while hovering the code/name (null = not hovering).
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+
+  const open = () => {
+    if (!url) return;
+    setPointer(null);
+    onOpenImage(model);
+  };
+  // Hover preview and click-to-enlarge only apply when there is an image.
+  const imageHandlers = url
+    ? {
+        onMouseMove: (e: React.MouseEvent) => setPointer({ x: e.clientX, y: e.clientY }),
+        onMouseLeave: () => setPointer(null),
+        onClick: open,
+      }
+    : {};
 
   return (
     <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 lg:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] lg:items-start lg:gap-4 lg:py-3">
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
-      <span className={`pt-2 font-mono text-sm ${comingSoon ? "text-neutral-400" : ""}`}>
+      <span
+        className={`pt-2 font-mono text-sm ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
+        {...imageHandlers}
+      >
         {model.code}
       </span>
 
-      {/* Hovering the name shows the image (only loaded when needed). */}
+      {/* Hover: preview to the right of the pointer. Click: enlarge. */}
       <div
-        className="relative min-w-0 lg:pt-2"
-        onMouseEnter={() => url && setPreviewing(true)}
-        onMouseLeave={() => setPreviewing(false)}
+        className={`min-w-0 lg:pt-2 ${url ? "cursor-zoom-in" : ""}`}
+        {...imageHandlers}
+        {...(url && {
+          role: "button",
+          tabIndex: 0,
+          "aria-label": `${model.code} ${model.name}: show image`,
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              open();
+            }
+          },
+        })}
       >
         <ModelInfo model={model} hasImage={Boolean(url)} />
-        {previewing && url && (
-          <div className="pointer-events-none absolute top-full left-0 z-20 mt-1 hidden h-72 w-72 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg lg:block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="" className="h-full w-full object-contain" />
-          </div>
-        )}
       </div>
+      {pointer && url && <HoverPreview url={url} pointer={pointer} />}
 
       {/* On phones and tablets the controls sit under the name. */}
       <div className="col-span-2 lg:col-span-1">
@@ -386,8 +429,34 @@ const ModelRow = memo(function ModelRow({ model, slots, version, ...callbacks }:
   );
 });
 
+// The small preview that follows the pointer, to its right (or to its left
+// if there isn't room). Only on screens wide enough to have a pointer.
+function HoverPreview({ url, pointer }: { url: string; pointer: { x: number; y: number } }) {
+  const fitsRight = pointer.x + PREVIEW_GAP + PREVIEW_SIZE + 8 <= window.innerWidth;
+  const left = fitsRight ? pointer.x + PREVIEW_GAP : pointer.x - PREVIEW_GAP - PREVIEW_SIZE;
+  const top = Math.min(
+    Math.max(8, pointer.y - PREVIEW_SIZE / 2),
+    window.innerHeight - PREVIEW_SIZE - 8,
+  );
+  return (
+    <div
+      className="pointer-events-none fixed z-30 hidden rounded-lg border border-neutral-200 bg-white p-2 shadow-lg lg:block"
+      style={{ left, top, width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" className="h-full w-full object-contain" />
+    </div>
+  );
+}
+
 // Grid view: one card per model, image on top, controls underneath.
-const ModelCard = memo(function ModelCard({ model, slots, version, ...callbacks }: ModelItemProps) {
+const ModelCard = memo(function ModelCard({
+  model,
+  slots,
+  version,
+  onOpenImage,
+  ...callbacks
+}: ModelItemProps & ImageProps) {
   const url = imageUrl(model.image_path);
   const comingSoon = model.availability === "coming_soon";
 
@@ -395,13 +464,20 @@ const ModelCard = memo(function ModelCard({ model, slots, version, ...callbacks 
     <li className="flex flex-col rounded-lg border border-neutral-200 bg-white">
       <div className="flex aspect-square items-center justify-center overflow-hidden rounded-t-lg border-b border-neutral-100 bg-white">
         {url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={`${model.code} ${model.name}`}
-            loading="lazy"
-            className={`h-full w-full object-contain ${comingSoon ? "opacity-50" : ""}`}
-          />
+          <button
+            type="button"
+            onClick={() => onOpenImage(model)}
+            aria-label={`Enlarge image of ${model.code} ${model.name}`}
+            className="h-full w-full cursor-zoom-in"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt={`${model.code} ${model.name}`}
+              loading="lazy"
+              className={`h-full w-full object-contain ${comingSoon ? "opacity-50" : ""}`}
+            />
+          </button>
         ) : (
           <span className="text-sm text-neutral-400">No image yet</span>
         )}
@@ -437,7 +513,7 @@ function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
       )}
       {comingSoon && (
         <span className="ml-2 rounded border border-neutral-300 px-1.5 py-0.5 align-middle text-xs text-neutral-500 italic">
-          On its way
+          {AVAILABILITY_LABELS.coming_soon}
         </span>
       )}
       <span className="block text-xs text-neutral-500">{model.categoryName}</span>
@@ -588,6 +664,67 @@ function LineEditor({
             Remove
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// The enlarged image. Clicking anywhere outside it, the × button, or
+// pressing Esc closes it.
+function ImagePopout({ model, onClose }: { model: Row; onClose: () => void }) {
+  const url = imageUrl(model.image_path);
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeButton.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    // Stop the page behind from scrolling while it's open.
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+
+  if (!url) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${model.code} ${model.name}`}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    >
+      {/* Clicks inside the white box don't close it. */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex max-h-full w-full max-w-3xl flex-col rounded-lg bg-white p-4 shadow-2xl"
+      >
+        <button
+          ref={closeButton}
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-2 right-2 flex h-10 w-10 items-center justify-center rounded-full text-2xl text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+        >
+          ×
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={`${model.code} ${model.name}`}
+          className="mx-auto max-h-[75vh] w-auto object-contain"
+        />
+        <p className="mt-3 pr-10">
+          <span className="font-mono text-sm text-neutral-600">{model.code}</span>{" "}
+          <span className="text-lg">{model.name}</span>
+          <span className="block text-sm text-neutral-500">{model.categoryName}</span>
+        </p>
       </div>
     </div>
   );
