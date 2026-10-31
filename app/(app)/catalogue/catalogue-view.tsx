@@ -599,7 +599,7 @@ function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
         </span>
       )}
       {comingSoon && (
-        <span className="ml-2 rounded border border-neutral-300 px-1.5 py-0.5 align-middle text-xs text-neutral-500 italic">
+        <span className="ml-2 rounded border border-neutral-300 px-1.5 py-0.5 align-middle text-xs whitespace-nowrap text-neutral-500 italic">
           {AVAILABILITY_LABELS.coming_soon}
         </span>
       )}

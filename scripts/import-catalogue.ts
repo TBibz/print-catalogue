@@ -203,7 +203,7 @@ async function main() {
   console.log(`Models created:       ${toCreate.length} ${verb}`.trimEnd());
   console.log(`Models updated:       ${toUpdate} ${verb}`.trimEnd());
   console.log(`  of which NEW badge: ${toImport.filter((m) => m.show_new_badge).length}`);
-  console.log(`  of which Model Not Ready: ${toImport.filter((m) => m.availability === "coming_soon").length}`);
+  console.log(`  of which Not ready: ${toImport.filter((m) => m.availability === "coming_soon").length}`);
   console.log(`Rows skipped:         ${skipped.length}`);
   for (const s of skipped.sort((a, b) => a.line - b.line)) {
     console.log(`  line ${s.line}  ${s.code}: ${s.reason}`);

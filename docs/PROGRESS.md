@@ -40,7 +40,7 @@ _Last updated: 2026-10-31 (Phase 7: money and stats)_
 - `model-images` bucket, browser-side resize, single upload / replace / remove in the model editor
 - `/admin/upload` bulk upload matched on `code_key`
 - Grid / list toggle (remembered per browser), hover preview, click-to-enlarge pop-out
-- "On its way" label renamed to "Model Not Ready"
+- "On its way" label renamed to "Model Not Ready" (later shortened to "Not ready")
 
 ### 5. Materials and printers: Done
 - `printers` (seeded with Saturn 4 Ultra and Centauri Carbon), `materials` (cost per unit generated; trigger keeps the charge at 2 × cost unless set by hand), `settings` (`resin_charge_divisor` = 15)

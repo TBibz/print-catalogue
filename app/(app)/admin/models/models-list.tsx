@@ -172,7 +172,7 @@ export function ModelsList({
             role="tab"
             aria-selected={filter === f.value}
             onClick={() => setFilter(f.value)}
-            className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+            className={`rounded-full border px-3.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
               filter === f.value
                 ? "border-neutral-900 bg-neutral-900 text-white"
                 : "border-neutral-300 text-neutral-700 hover:border-neutral-500 hover:text-neutral-900"
@@ -270,7 +270,7 @@ export function ModelsList({
                 </span>
                 <span className="col-start-1 md:col-start-auto">
                   <span
-                    className={`inline-block rounded-full border px-2.5 py-0.5 text-xs ${AVAILABILITY_STYLES[m.availability]}`}
+                    className={`inline-block rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap ${AVAILABILITY_STYLES[m.availability]}`}
                   >
                     {AVAILABILITY_LABELS[m.availability]}
                   </span>

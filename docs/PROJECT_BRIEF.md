@@ -50,7 +50,7 @@ Build tables only when their phase is reached. Names and fields below are the ta
 - `name`, `category_id`
 - `default_scale` (text, nullable, e.g. "70mm"), `other_scales` (text[], default empty). Usual scales: 28mm, 54mm, 60mm, 70mm, 80mm, 100mm, but any text is allowed.
 - `availability`: `available` | `coming_soon` | `hidden`
-  - coming_soon = greyed out and labelled "Model Not Ready", but **can still be requested**
+  - coming_soon = greyed out and labelled "Not ready" (the label never wraps), but **can still be requested**
   - hidden = retired; not shown in the catalogue, kept for history
 - `image_path` (nullable; some models have no image). Images are shrunk in the browser to 1000px on white (WebP, JPEG fallback) before upload.
 - `show_new_badge` (bool). The NEW badge shows when this is true AND the model's successful printed total is < 4.

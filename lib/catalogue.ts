@@ -67,7 +67,7 @@ export const USUAL_SCALES = ["28mm", "54mm", "60mm", "70mm", "80mm", "100mm"];
 
 export const AVAILABILITY_LABELS: Record<Availability, string> = {
   available: "Available",
-  coming_soon: "Model Not Ready",
+  coming_soon: "Not ready",
   hidden: "Retired",
 };
 
