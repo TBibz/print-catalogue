@@ -4,7 +4,7 @@
 // allows the admin, and requireAdmin() checks first for a clear message).
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Availability } from "@/lib/catalogue";
+import { ADMIN_MODEL_COLUMNS, type AdminModel, type Availability } from "@/lib/catalogue";
 
 export type ModelInput = {
   id: string | null; // null = a new model
@@ -20,8 +20,10 @@ export type ModelInput = {
 
 // `field` says which box the error belongs to, so the form can show it there.
 export type ModelResult =
-  | { ok: true; id: string }
+  | { ok: true; model: AdminModel }
   | { ok: false; error: string; field?: keyof ModelInput };
+
+export type DeleteModelResult = { ok: true } | { ok: false; error: string };
 
 const AVAILABILITIES: Availability[] = ["available", "coming_soon", "hidden"];
 
@@ -76,7 +78,7 @@ export async function saveModel(input: ModelInput): Promise<ModelResult> {
   const query = input.id
     ? supabase.from("models").update(values).eq("id", input.id)
     : supabase.from("models").insert(values);
-  const { data, error } = await query.select("id").maybeSingle<{ id: string }>();
+  const { data, error } = await query.select(ADMIN_MODEL_COLUMNS).maybeSingle<AdminModel>();
 
   if (error) {
     console.error("models:", error.message);
@@ -93,7 +95,35 @@ export async function saveModel(input: ModelInput): Promise<ModelResult> {
     }
     return { ok: false, error: "Couldn't save. Please check your connection and try again." };
   }
-  if (!data) return { ok: false, error: "This model no longer exists. Go back to the list." };
+  if (!data) return { ok: false, error: "This model no longer exists. Refresh the page." };
 
-  return { ok: true, id: data.id };
+  return { ok: true, model: data };
+}
+
+// Deletes a model for good, along with its open request lines (the
+// database does that part, see 0004_model_delete.sql).
+export async function deleteModel(id: string): Promise<DeleteModelResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("models")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("models delete:", error.message);
+    if (error.code === "23503") {
+      // Something still points at it: print history (from Phase 6), or
+      // open requests if 0004_model_delete.sql hasn't been run yet.
+      return {
+        ok: false,
+        error: "This model is still in use (requests or print history), so it can't be deleted. Retire it instead.",
+      };
+    }
+    return { ok: false, error: "Couldn't delete. Please check your connection and try again." };
+  }
+  if (!data) return { ok: false, error: "This model was already deleted. Refresh the page." };
+  return { ok: true };
 }

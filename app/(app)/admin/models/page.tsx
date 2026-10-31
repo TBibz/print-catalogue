@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { loadAdminModels, loadCategories } from "@/lib/data";
+import { loadAdminModels, loadCategories, loadRequestLines } from "@/lib/data";
 import { ModelsList } from "./models-list";
 
 export const metadata: Metadata = { title: "Models · Print Catalogue" };
@@ -11,15 +10,7 @@ export const metadata: Metadata = { title: "Models · Print Catalogue" };
 export default function ModelsPage() {
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Models</h1>
-        <Link
-          href="/admin/models/new"
-          className="rounded-md bg-neutral-900 px-4 py-2.5 text-base font-medium text-white hover:bg-neutral-700"
-        >
-          + Add model
-        </Link>
-      </div>
+      <h1 className="mb-4 text-2xl font-semibold">Models</h1>
       <Suspense fallback={<p className="text-neutral-500">Loading models…</p>}>
         <ModelsData />
       </Suspense>
@@ -33,11 +24,17 @@ async function ModelsData() {
 
   let data = null;
   try {
-    const [categories, models] = await Promise.all([
+    const [categories, models, lines] = await Promise.all([
       loadCategories(supabase),
       loadAdminModels(supabase),
+      loadRequestLines(supabase),
     ]);
-    data = { categories, models };
+    // How many open request lines each model has (shown when deleting).
+    const requestCounts: Record<string, number> = {};
+    for (const line of lines) {
+      requestCounts[line.model_id] = (requestCounts[line.model_id] ?? 0) + 1;
+    }
+    data = { categories, models, requestCounts };
   } catch (error) {
     console.error("Loading models failed:", error);
   }
