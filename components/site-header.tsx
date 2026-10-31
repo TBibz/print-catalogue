@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { signOut } from "@/app/actions/auth";
+import { AdminMenu } from "@/components/admin-menu";
 import { getCurrentProfile } from "@/lib/auth";
 
 const navLink =
@@ -47,9 +48,7 @@ async function AdminLinks() {
       <Link href="/admin/queue" className={navLink}>
         Queue
       </Link>
-      <Link href="/admin/models" className={navLink}>
-        Models
-      </Link>
+      <AdminMenu className={navLink} />
     </>
   );
 }

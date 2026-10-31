@@ -1,0 +1,172 @@
+"use server";
+
+// Printers, materials and settings (admin only: RLS allows only the admin,
+// and requireAdmin() checks first for a clear message).
+import { requireAdmin } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import {
+  MATERIAL_COLUMNS,
+  PRINTER_COLUMNS,
+  SETTINGS,
+  unitFor,
+  type Material,
+  type MaterialType,
+  type Printer,
+} from "@/lib/materials";
+
+type Fail = { ok: false; error: string; field?: string };
+const TYPES: MaterialType[] = ["resin", "fdm"];
+
+// Something else (e.g. a print job, from Phase 6) still uses it.
+const IN_USE =
+  "This is used by print jobs, so it can't be deleted. Retire it instead.";
+
+function friendly(error: { code?: string; message: string }, what: string): Fail {
+  console.error(`${what}:`, error.message);
+  if (error.code === "23505") {
+    return { ok: false, field: "name", error: `Another ${what} already has this name.` };
+  }
+  if (error.code === "23503") return { ok: false, error: IN_USE };
+  return { ok: false, error: "Couldn't save. Please check your connection and try again." };
+}
+
+// ---- Printers ---------------------------------------------------------------
+
+export type PrinterInput = { id: string | null; name: string; type: MaterialType; active: boolean };
+
+export async function savePrinter(input: PrinterInput): Promise<{ ok: true; printer: Printer } | Fail> {
+  await requireAdmin();
+  const name = String(input.name ?? "").trim();
+  if (!name) return { ok: false, field: "name", error: "Please enter a name." };
+  if (name.length > 100) return { ok: false, field: "name", error: "Names can be at most 100 characters." };
+  if (!TYPES.includes(input.type)) return { ok: false, field: "type", error: "Please choose a type." };
+
+  const supabase = await createClient();
+  const values = { name, type: input.type, active: Boolean(input.active) };
+  const query = input.id
+    ? supabase.from("printers").update(values).eq("id", input.id)
+    : supabase.from("printers").insert(values);
+  const { data, error } = await query.select(PRINTER_COLUMNS).maybeSingle<Printer>();
+  if (error) return friendly(error, "printer");
+  if (!data) return { ok: false, error: "This printer no longer exists. Refresh the page." };
+  return { ok: true, printer: data };
+}
+
+export async function deletePrinter(id: string): Promise<{ ok: true } | Fail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("printers").delete().eq("id", id);
+  if (error) return friendly(error, "printer");
+  return { ok: true };
+}
+
+// ---- Materials --------------------------------------------------------------
+
+export type MaterialInput = {
+  id: string | null;
+  type: MaterialType;
+  name: string;
+  colour: string;
+  packSize: string;
+  packCost: string;
+  // Charge per 1000 units (per kg / per litre). Only used when overridden.
+  chargePer1000: string;
+  chargeOverridden: boolean;
+  inStock: boolean;
+  offerAsColour: boolean;
+  active: boolean;
+};
+
+export async function saveMaterial(
+  input: MaterialInput,
+): Promise<{ ok: true; material: Material } | Fail> {
+  await requireAdmin();
+
+  const name = String(input.name ?? "").trim();
+  const colour = String(input.colour ?? "").trim();
+  const packSize = Number(input.packSize);
+  const packCost = Number(input.packCost);
+  const charge = Number(input.chargePer1000);
+
+  if (!TYPES.includes(input.type)) return { ok: false, field: "type", error: "Please choose a type." };
+  if (!name) return { ok: false, field: "name", error: "Please enter a name." };
+  if (name.length > 100) return { ok: false, field: "name", error: "Names can be at most 100 characters." };
+  if (colour.length > 50) return { ok: false, field: "colour", error: "Colours can be at most 50 characters." };
+  if (!(packSize > 0) || packSize > 100000) {
+    return { ok: false, field: "packSize", error: "Enter the pack size, e.g. 1000." };
+  }
+  if (!(packCost >= 0) || packCost > 100000 || String(input.packCost).trim() === "") {
+    return { ok: false, field: "packCost", error: "Enter the pack price in £, e.g. 12.49." };
+  }
+  if (input.chargeOverridden && (!(charge >= 0) || charge > 100000 || String(input.chargePer1000).trim() === "")) {
+    return { ok: false, field: "chargePer1000", error: "Enter the charge in £, e.g. 24.98." };
+  }
+
+  const values = {
+    type: input.type,
+    name,
+    colour,
+    unit: unitFor(input.type),
+    pack_size: packSize,
+    pack_cost: Math.round(packCost * 100) / 100,
+    charge_overridden: Boolean(input.chargeOverridden),
+    // When not overridden, the database sets it to 2 × cost.
+    ...(input.chargeOverridden ? { charge_per_unit: charge / 1000 } : {}),
+    in_stock: Boolean(input.inStock),
+    offer_as_colour: Boolean(input.offerAsColour),
+    active: Boolean(input.active),
+  };
+
+  const supabase = await createClient();
+  const query = input.id
+    ? supabase.from("materials").update(values).eq("id", input.id)
+    : supabase.from("materials").insert(values);
+  const { data, error } = await query.select(MATERIAL_COLUMNS).maybeSingle<Material>();
+  if (error) return friendly(error, "material");
+  if (!data) return { ok: false, error: "This material no longer exists. Refresh the page." };
+  return { ok: true, material: data };
+}
+
+// Quick tick box on the list: in stock or not.
+export async function setMaterialInStock(
+  id: string,
+  inStock: boolean,
+): Promise<{ ok: true; material: Material } | Fail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("materials")
+    .update({ in_stock: Boolean(inStock) })
+    .eq("id", id)
+    .select(MATERIAL_COLUMNS)
+    .maybeSingle<Material>();
+  if (error) return friendly(error, "material");
+  if (!data) return { ok: false, error: "This material no longer exists. Refresh the page." };
+  return { ok: true, material: data };
+}
+
+export async function deleteMaterial(id: string): Promise<{ ok: true } | Fail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("materials").delete().eq("id", id);
+  if (error) return friendly(error, "material");
+  return { ok: true };
+}
+
+// ---- Settings ---------------------------------------------------------------
+
+export async function saveSetting(key: string, value: string): Promise<{ ok: true } | Fail> {
+  await requireAdmin();
+  if (!SETTINGS.some((s) => s.key === key)) return { ok: false, error: "Unknown setting." };
+
+  const trimmed = String(value ?? "").trim();
+  if (key === "resin_charge_divisor") {
+    const n = Number(trimmed);
+    if (!(n > 0) || n > 10000) return { ok: false, error: "Enter a number above 0, e.g. 15." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("settings").upsert({ key, value: trimmed });
+  if (error) return friendly(error, "setting");
+  return { ok: true };
+}
