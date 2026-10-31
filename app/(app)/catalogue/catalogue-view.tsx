@@ -12,7 +12,7 @@ import {
 import { imageUrl } from "@/lib/images";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
-import { isLightColour, textColourOn, type ColourOption } from "@/lib/colours";
+import { ANY_COLOUR, colourName, isLightColour, textColourOn, type ColourOption } from "@/lib/colours";
 import { ColourStripe } from "@/components/colour-label";
 import type { CategoryCounts } from "@/lib/data";
 import {
@@ -242,6 +242,12 @@ export function CatalogueView({
   // Within one category its name would just repeat on every row.
   const showCategory = shownTab === ALL;
 
+  // The Colour column fits the longest colour name (or "Any colour") and no
+  // more, so the Note box gets the rest. Worked out from the real names, so
+  // a longer colour added later widens it (up to a limit; past that, names
+  // are cut short with "…").
+  const colourColumn = useMemo(() => colourColumnWidth(colours), [colours]);
+
   // Choosing a category clears the search (search covers every category).
   const chooseCategory = (id: string) => {
     setActiveTab(id);
@@ -249,7 +255,7 @@ export function CatalogueView({
   };
 
   return (
-    <div>
+    <div style={{ "--colour-col": colourColumn } as React.CSSProperties}>
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <label htmlFor="catalogue-search" className="sr-only">
           Search the catalogue
@@ -741,10 +747,20 @@ function ImageIcon() {
 // "N requested · M printing") on a line underneath, so they need no column.
 // Size and Colour leave room for the small "+" (another size / colour).
 const PLAIN_ROW = "grid-cols-[7.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
-const COLOUR_ROW = "grid-cols-[7.25rem_13.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
+const COLOUR_ROW = "grid-cols-[7.25rem_var(--colour-col)_3.5rem_6.5rem_minmax(0,1fr)]";
 // The same with the xl: prefix, written out in full so Tailwind finds them.
 const XL_PLAIN_ROW = "xl:grid-cols-[7.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
-const XL_COLOUR_ROW = "xl:grid-cols-[7.25rem_13.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
+const XL_COLOUR_ROW = "xl:grid-cols-[7.25rem_var(--colour-col)_3.5rem_6.5rem_minmax(0,1fr)]";
+
+// Width of the Colour column (the --colour-col CSS variable): the longest
+// name shown in the closed box (a colour, or "Any colour") at about 0.5rem
+// per character of 14px text, plus 1.375rem before the text (padding,
+// stripe, gap), 2rem after it (the arrow), and 2rem for the "+" button and
+// a small gap. Capped at 16rem.
+function colourColumnWidth(colours: ColourOption[]) {
+  const longest = Math.max(ANY_COLOUR.length, ...colours.map((c) => colourName(c).length));
+  return `${Math.min(16, longest * 0.5 + 5.375)}rem`;
+}
 
 // All the request lines for one model. The first line has a small "+"
 // beside its size (and, for categories with colours, its colour) dropdown

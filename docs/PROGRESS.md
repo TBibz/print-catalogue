@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (single-line catalogue rows)_
+_Last updated: 2026-10-31 (Note box always widest)_
 
 ## Phases
 
@@ -86,6 +86,11 @@ _Last updated: 2026-10-31 (single-line catalogue rows)_
 - Column widths (xl): Code 5rem, Size 5.5rem, Colour 12.5rem (fits "Sky Blue (out of stock)"), Qty 4rem, Urgency 7rem, Note takes the rest (about 15rem at 1280px, the widest). The status column is gone: "Saving…" / "Saved ✓" show inside the Note box, and errors / "N requested · M printing" / Remove on a line underneath
 - Checked with sample data in the browser pane at 1280px (list and grid view), using a temporary preview page that wasn't committed
 
+### Note box always the widest: Done
+- Closed colour box: the chosen colour is drawn over the native select (stripe + name); an out-of-stock colour shows as its name in grey italics with the tooltip "Out of stock" (the open list still says "(out of stock)"); very long names truncate with "…" and the full name in the tooltip
+- The Colour column width (`--colour-col`) is worked out from the actual colour names: the longest of them or "Any colour", at about 0.5rem per character, plus room for the stripe, arrow and "+" (capped at 16rem). With today's materials that's 10.4rem (was 13.25rem); the freed space goes to Note
+- Checked with the seeded colour names at 1280px: on "All" Note is 218px vs Colour 166px; inside BASES and in grid view too (temporary preview page, not committed)
+
 ### Single-line catalogue rows: Done
 - Controls 30px, rows about 4px padding, everything vertically centred (catalogue list, grid controls, queue)
 - No category line: on "All" a small category tag (stripe + name) in its own column; none inside a category
@@ -149,7 +154,6 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
 - Drag-and-drop on the Categories page needs a mouse; on a phone or tablet use the ↑ ↓ buttons.
 - Custom domain (Phase 8) not done: it's set up in Vercel and your domain registrar, not in code.
-- On "All" at 1280px the Note box is narrower than the Colour box (the Colour box must fit "Sky Blue (out of stock)"); wider screens and single categories have more room.
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 - Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
 

@@ -22,10 +22,9 @@ const box = `${frame} px-2.5 text-sm`;
 // some browsers ignore the padding of a native-looking <select>.
 const selectBox = `${frame} w-full cursor-pointer appearance-none pr-8 text-sm disabled:cursor-not-allowed disabled:bg-neutral-100`;
 
-// Left padding of a dropdown's text: normal, or after a colour stripe
-// (10px in, 6px stripe, 6px gap, the same spacing as ColourLabel).
+// Left padding of a dropdown's text (and where the colour box's overlay
+// starts), so text in every box lines up.
 const TEXT_LEFT = "pl-2.5";
-const TEXT_LEFT_AFTER_STRIPE = "pl-[1.375rem]";
 const STRIPE_LEFT = "left-2.5";
 
 function SelectArrow() {
@@ -178,10 +177,14 @@ export function ScaleSelect({
 }
 
 // "Any colour" plus every filament offered as a colour. Out-of-stock ones
-// are listed but greyed out and can't be picked, except by a line that
-// already uses one (it keeps showing it). The chosen colour's stripe sits
-// inside the box, left of the name (a native <select> can't draw it, so
-// it's laid over the box, which leaves room for it).
+// are listed (with "(out of stock)") but greyed out and can't be picked,
+// except by a line that already uses one (it keeps showing it).
+//
+// The closed box shows the chosen colour drawn over the native <select>
+// (whose own text is made transparent): its stripe, then its name, which
+// is grey italic if it's out of stock (tooltip "Out of stock") and cut
+// short with "…" if it's very long. The open list is the browser's own and
+// keeps the full wording.
 export function ColourSelect({
   value,
   options,
@@ -198,24 +201,23 @@ export function ColourSelect({
   locked?: boolean; // true while some are printing: the colour can't change
 }) {
   const current = options.find((o) => o.id === value);
+  const shownName = current ? colourName(current) : ANY_COLOUR;
+  const unavailable = current && !current.available;
+  const status = unavailable ? (current.in_stock ? "No longer offered" : "Out of stock") : null;
+  const tooltip = [status ?? shownName, locked ? "Some are being printed, so the colour can't be changed" : null]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div className="relative">
-      {current && (
-        <span className={`pointer-events-none absolute inset-y-0 ${STRIPE_LEFT} flex items-center`}>
-          <ColourStripe hex={current.colour_hex} />
-        </span>
-      )}
       <select
         aria-label={label}
         value={value ?? ""}
         disabled={locked}
-        title={locked ? "Some are being printed, so the colour can't be changed" : undefined}
+        title={tooltip}
         onChange={(e) => onChange(e.target.value || null)}
-        // With a stripe, the text starts after it; "Any colour" keeps the
-        // normal padding, so text lines up with the other boxes.
-        className={`${selectBox} ${current ? TEXT_LEFT_AFTER_STRIPE : TEXT_LEFT}`}
+        className={`${selectBox} ${TEXT_LEFT} text-transparent`}
       >
-        <option value="" disabled={disabledOptions.includes(null)}>
+        <option value="" disabled={disabledOptions.includes(null)} className="text-neutral-900">
           {ANY_COLOUR}
         </option>
         {options.map((o) => {
@@ -225,6 +227,7 @@ export function ColourSelect({
               key={o.id}
               value={o.id}
               disabled={disabledOptions.includes(o.id) || (!o.available && !mine)}
+              className="text-neutral-900"
             >
               {colourName(o)}
               {o.available ? "" : o.in_stock ? " (no longer offered)" : " (out of stock)"}
@@ -232,6 +235,16 @@ export function ColourSelect({
           );
         })}
       </select>
+      {/* What the closed box shows (laid over the select, clicks go through). */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute inset-y-0 ${STRIPE_LEFT} right-8 flex min-w-0 items-center gap-1.5 text-sm`}
+      >
+        {current && <ColourStripe hex={current.colour_hex} />}
+        <span className={`truncate ${unavailable ? "text-neutral-400 italic" : "text-neutral-900"}`}>
+          {shownName}
+        </span>
+      </span>
       <SelectArrow />
     </div>
   );
