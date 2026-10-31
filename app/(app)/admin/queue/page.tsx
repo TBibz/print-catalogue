@@ -47,7 +47,7 @@ async function QueueData() {
     const materialsById = new Map(options.materials.map((m) => [m.id, m]));
     const colourOf = (id: string | null) => {
       const m = id ? materialsById.get(id) : undefined;
-      return m ? { colour: m.colour, name: m.colour || m.name } : null;
+      return m ? { hex: m.colour_hex, name: m.colour || m.name } : null;
     };
 
     const rows: QueueRow[] = lines.flatMap((line) => {

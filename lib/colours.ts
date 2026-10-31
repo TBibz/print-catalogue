@@ -1,46 +1,34 @@
 // Colour choices for request lines (categories with colour options, e.g.
 // BASES). A colour is a filament from Materials; null means "Any colour".
+// A material's true colour is materials.colour_hex (set with a colour
+// picker on the Materials page), the only source of colour in the app.
 
-// A row from the colour_options view (0010_colours.sql): names and stock
-// only, so the requester can read it.
+// A row from the colour_options view (0011): names, colour and stock only,
+// so the requester can read it.
 export type ColourOption = {
   id: string;
   name: string; // e.g. "PLA Black"
   colour: string; // e.g. "Black"
+  colour_hex: string; // e.g. "#111111"
   available: boolean; // offered as a colour, in stock and in use
   in_stock: boolean;
 };
 
 export const ANY_COLOUR = "Any colour";
+export const DEFAULT_COLOUR_HEX = "#9ca3af"; // neutral grey
 
 // What to call a colour in a dropdown or list.
-export const colourName = (option: Pick<ColourOption, "name" | "colour">) =>
-  option.colour || option.name;
+export const colourName = (option: { name: string; colour: string }) => option.colour || option.name;
 
-// A CSS colour for the little swatch, from the material's colour name.
-// Common filament names are mapped by hand; anything else is tried as a
-// CSS colour name ("Sky Blue" → "skyblue"), and the swatch's border keeps
-// it visible if the browser doesn't know it.
-const SWATCHES: Record<string, string> = {
-  black: "#111111",
-  white: "#ffffff",
-  grey: "#9ca3af",
-  gray: "#9ca3af",
-  silver: "#c0c0c0",
-  red: "#dc2626",
-  orange: "#f97316",
-  yellow: "#facc15",
-  green: "#16a34a",
-  blue: "#2563eb",
-  "sky blue": "#7dd3fc",
-  purple: "#9333ea",
-  pink: "#f472b6",
-  brown: "#92400e",
-  gold: "#d4a017",
-  marble: "linear-gradient(135deg, #f5f5f4 0%, #d6d3d1 35%, #f5f5f4 55%, #a8a29e 100%)",
-};
-
-export function swatchBackground(colour: string) {
-  const key = colour.trim().toLowerCase();
-  return SWATCHES[key] ?? key.replace(/\s+/g, "");
+// True for very light colours (e.g. white), which need an outline to show
+// up on a white page. Uses the colour's relative luminance (0 = black,
+// 1 = white), worked out from the hex.
+export function isLightColour(hex: string) {
+  const match = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!match) return false;
+  const [r, g, b] = match.slice(1).map((h) => {
+    const c = parseInt(h, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.8;
 }

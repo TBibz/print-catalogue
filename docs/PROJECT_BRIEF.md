@@ -42,7 +42,7 @@ Build tables only when their phase is reached. Names and fields below are the ta
 - A trigger creates a profile (role `requester` by default) when an auth user is created.
 
 ### categories
-- `id`, `name` (unique, e.g. "STAR WARS"), `sort_order` (int, default 0; lowest first, then by name), `has_colour_options` (bool, default false; `0010_colours.sql` sets it for BASES)
+- `id`, `name` (unique, e.g. "STAR WARS"), `sort_order` (int: the category's position, 1 = first; set by drag-and-drop on the Categories page and saved with `reorder_categories()`; new categories go last), `has_colour_options` (bool, default false; `0010_colours.sql` sets it for BASES)
 
 ### models
 - `id`, `code` (unique, text, e.g. "SW001", "Base001", "WW2 001", "DN020a", "DN005a+b")
@@ -74,13 +74,13 @@ One row per model + option combination that Dad currently wants.
 
 ### materials (Phase 5)
 The material stock index. It replaces the price table in "Centauri Prints" (cols I–M) and the "Resins" tab.
-- `id`, `type` (`resin` | `fdm`), `name` (e.g. "PLA Black", "ABS 2.0 Grey"), `colour`
+- `id`, `type` (`resin` | `fdm`), `name` (e.g. "PLA Black", "ABS 2.0 Grey"), `colour` (name, e.g. "Black"), `colour_hex` (e.g. `#111111`, picked with a colour picker; the only source of a material's displayed colour)
 - `unit` (`ml` | `g`), `pack_size` (e.g. 1000), `pack_cost` (£)
 - `cost_per_unit` (derived: pack_cost / pack_size), `charge_per_unit` (£ per g for FDM charges; default 2 × cost_per_unit, editable)
 - `charge_overridden` (bool): false = a trigger keeps `charge_per_unit` at 2 × cost; true = set by hand and left alone
 - `in_stock` (bool), `offer_as_colour` (bool: shown as a colour choice for categories with colour options, while also in stock)
 - `active` (bool): false = retired, kept for history, hidden from new print jobs
-- Printers, materials and settings are admin-only. The requester sees colour names only through the `colour_options` view (id, name, colour, available, in_stock; no prices): filaments offered as a colour, plus any colour an existing request still uses.
+- Printers, materials and settings are admin-only. The requester sees colours only through the `colour_options` view (id, name, colour, colour_hex, available, in_stock; no prices): every filament offered as a colour (in stock or not, but not retired), plus any colour an existing request still uses.
 - Later: individual spools/bottles and remaining amount.
 
 ### print_jobs (Phase 6) — one job = one plate
@@ -112,7 +112,7 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 ## 5. Core rules
 
 **Sorting**
-- Catalogue: category sort order (lowest first), then category name A→Z, then code in natural order (use `Intl.Collator('en', { numeric: true, sensitivity: 'base' })`).
+- Catalogue: category position (the order on the Categories page), then code in natural order (use `Intl.Collator('en', { numeric: true, sensitivity: 'base' })`).
 - Print queue: urgency (ASAP → URGENT → PRIORITY → none), then code in natural order.
 
 **Urgency colours** (match the old sheet)
@@ -153,20 +153,23 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 
 Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 80rem (`max-w-7xl`) wide.
 
+**Colours are shown one way everywhere** (`components/colour-label.tsx`): a solid 6px vertical stripe of the material's `colour_hex`, full text height with slightly rounded corners, immediately left of the colour name in normal dark text. Very light colours (worked out from the hex's luminance) get a thin grey outline. "Any colour" has no stripe. In the catalogue's colour dropdown the chosen colour's stripe sits inside the box, left of the name.
+
 Request controls (quantity, urgency, note, size, colour) are all the same height (44px) wherever they appear.
 
 Everyone:
 - `/login`
-- `/catalogue`: categories in a left-hand sidebar (All + each category, with model counts; a category dropdown above the list below 1024px wide), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Models in a category with colour options get a colour dropdown ("Any colour" plus in-stock filaments offered as colours, with a swatch; a colour a line already uses stays listed, marked "out of stock") and "+ another colour" for another line in a different colour. Size and colour are locked while some are printing. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing". From 1280px wide each list row is on one line; narrower, the controls sit under the name.
+- `/catalogue`: categories in a left-hand sidebar (All + each category, with model counts; a category dropdown above the list below 1024px wide), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Models in a category with colour options get a colour dropdown ("Any colour" plus every filament offered as a colour; out-of-stock ones are greyed out, marked "(out of stock)" and can't be chosen, but a line already using one keeps showing it) and "+ another colour" for another line in a different colour. Size and colour are locked while some are printing. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing". From 1280px wide each list row is on one line; narrower, the controls sit under the name.
 - `/notepad`: handwritten-style font sitting straight on the plain white page (no card, paper or ruled lines), bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
 
 Admin only:
-- `/admin/queue`: all request lines sorted by the queue rule, with "N requested · M printing". Tick lines, set how many go on this plate (default = what's left to print), add catalogue models (search) or free-text items, choose printer, see my cost and charge live, "Start print". Colour items show a swatch and name; on a filament printer, if every coloured item on the plate is the same colour, that filament is pre-selected (still changeable). Shows "N unticked notepad notes" at the top, linking to /notepad.
+- `/admin/queue`: all request lines sorted by the queue rule, with "N requested · M printing". Tick lines, set how many go on this plate (default = what's left to print), add catalogue models (search) or free-text items, choose printer, see my cost and charge live, "Start print". Colour items show their colour stripe and name; on a filament printer, if every coloured item on the plate is the same colour, that filament is pre-selected (still changeable). Shows "N unticked notepad notes" at the top, linking to /notepad.
 - `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item and All succeeded / All failed shortcuts, Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert. Any job (printing, completed or cancelled) can be deleted for good, after an in-page confirmation.
 - `/admin/models` also shows each model's printed total.
 - `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it.
 - `/admin/upload`: bulk image upload; match file name to `code_key`, create new models for unknown codes (choose a category for the batch), ask before replacing an existing image.
-- `/admin/categories`: each category with its model count; rename, sort order, colour options, add; delete only when it has no models.
+- `/admin/categories`: each category with its model count; drag-and-drop order (⠿ handle, plus ↑ ↓ buttons), saved immediately; rename, colour options, add; delete only when it has no models.
+- `/admin/materials`: each material shows its colour stripe; adding or editing uses a native colour picker for `colour_hex`.
 - `/admin/materials`, `/admin/printers`
 - `/admin/money`: month-by-month costs (purchases), charges for prints, payments received, difference; plus print stats.
 - `/admin/settings`

@@ -67,6 +67,7 @@ export type MaterialInput = {
   type: MaterialType;
   name: string;
   colour: string;
+  colourHex: string; // from the colour picker, e.g. "#111111"
   packSize: string;
   packCost: string;
   // Charge per 1000 units (per kg / per litre). Only used when overridden.
@@ -84,6 +85,7 @@ export async function saveMaterial(
 
   const name = String(input.name ?? "").trim();
   const colour = String(input.colour ?? "").trim();
+  const colourHex = String(input.colourHex ?? "").trim().toLowerCase();
   const packSize = Number(input.packSize);
   const packCost = Number(input.packCost);
   const charge = Number(input.chargePer1000);
@@ -92,6 +94,9 @@ export async function saveMaterial(
   if (!name) return { ok: false, field: "name", error: "Please enter a name." };
   if (name.length > 100) return { ok: false, field: "name", error: "Names can be at most 100 characters." };
   if (colour.length > 50) return { ok: false, field: "colour", error: "Colours can be at most 50 characters." };
+  if (!/^#[0-9a-f]{6}$/.test(colourHex)) {
+    return { ok: false, field: "colourHex", error: "Pick a colour." };
+  }
   if (!(packSize > 0) || packSize > 100000) {
     return { ok: false, field: "packSize", error: "Enter the pack size, e.g. 1000." };
   }
@@ -106,6 +111,7 @@ export async function saveMaterial(
     type: input.type,
     name,
     colour,
+    colour_hex: colourHex,
     unit: unitFor(input.type),
     pack_size: packSize,
     pack_cost: Math.round(packCost * 100) / 100,

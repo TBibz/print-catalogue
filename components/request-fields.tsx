@@ -1,7 +1,8 @@
 "use client";
 
 // The controls for one request line, used by the catalogue and the queue.
-import { ANY_COLOUR, colourName, swatchBackground, type ColourOption } from "@/lib/colours";
+import { ColourStripe } from "@/components/colour-label";
+import { ANY_COLOUR, colourName, type ColourOption } from "@/lib/colours";
 import { URGENCIES, URGENCY_STYLES, scaleLabel, type Urgency } from "@/lib/requests";
 import type { SaveStatus } from "@/lib/use-line-autosave";
 
@@ -143,8 +144,11 @@ export function ScaleSelect({
   );
 }
 
-// "Any colour" plus the colours on offer (in stock). A colour a line already
-// uses stays listed even if it's gone out of stock, marked as such.
+// "Any colour" plus every filament offered as a colour. Out-of-stock ones
+// are listed but greyed out and can't be picked, except by a line that
+// already uses one (it keeps showing it). The chosen colour's stripe sits
+// inside the box, left of the name (a native <select> can't draw it, so
+// it's laid over the box, which leaves room for it).
 export function ColourSelect({
   value,
   options,
@@ -161,16 +165,12 @@ export function ColourSelect({
   locked?: boolean; // true while some are printing: the colour can't change
 }) {
   const current = options.find((o) => o.id === value);
-  const shown = options.filter((o) => o.available || o.id === value);
   return (
     <div className="relative">
-      {/* The swatch for the chosen colour, inside the box on the left. */}
       {current && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-neutral-400"
-          style={{ background: swatchBackground(current.colour) }}
-        />
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+          <ColourStripe hex={current.colour_hex} />
+        </span>
       )}
       <select
         aria-label={label}
@@ -178,19 +178,27 @@ export function ColourSelect({
         disabled={locked}
         title={locked ? "Some are being printed, so the colour can't be changed" : undefined}
         onChange={(e) => onChange(e.target.value || null)}
-        className={`${box} w-full cursor-pointer text-sm disabled:cursor-not-allowed disabled:bg-neutral-100 ${
-          current ? "pl-8" : ""
-        }`}
+        // Inline style so the room for the stripe always wins over the
+        // box's own padding.
+        style={current ? { paddingLeft: "1.75rem" } : undefined}
+        className={`${box} w-full cursor-pointer text-sm disabled:cursor-not-allowed disabled:bg-neutral-100`}
       >
         <option value="" disabled={disabledOptions.includes(null)}>
           {ANY_COLOUR}
         </option>
-        {shown.map((o) => (
-          <option key={o.id} value={o.id} disabled={disabledOptions.includes(o.id)}>
-            {colourName(o)}
-            {o.available ? "" : o.in_stock ? " (no longer offered)" : " (out of stock)"}
-          </option>
-        ))}
+        {options.map((o) => {
+          const mine = o.id === value;
+          return (
+            <option
+              key={o.id}
+              value={o.id}
+              disabled={disabledOptions.includes(o.id) || (!o.available && !mine)}
+            >
+              {colourName(o)}
+              {o.available ? "" : o.in_stock ? " (no longer offered)" : " (out of stock)"}
+            </option>
+          );
+        })}
       </select>
     </div>
   );

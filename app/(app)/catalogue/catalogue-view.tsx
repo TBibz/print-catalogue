@@ -227,8 +227,9 @@ export function CatalogueView({
   });
 
   const shownTab = searching ? ALL : activeTab;
-  // The column headings include "Colour" when every row shown has colours.
-  const colourHeader = visible.length > 0 && visible.every((r) => r.hasColours);
+  // When any row shown offers colours, every row gets a Colour column (blank
+  // where there's no choice), so the headings line up with every row.
+  const colourHeader = visible.some((r) => r.hasColours);
 
   // Choosing a category clears the search (search covers every category).
   const chooseCategory = (id: string) => {
@@ -352,7 +353,8 @@ export function CatalogueView({
               onSaved={handleSaved}
               onRemoved={handleRemoved}
               onAddSlot={handleAddSlot}
-                colours={colours}
+              colours={colours}
+              colourColumn={false}
               onOpenImage={openImage}
             />
           ))}
@@ -383,6 +385,7 @@ export function CatalogueView({
                 onRemoved={handleRemoved}
                 onAddSlot={handleAddSlot}
                 colours={colours}
+                colourColumn={colourHeader}
                 onOpenImage={openImage}
               />
             ))}
@@ -434,6 +437,7 @@ type ModelItemProps = SlotCallbacks & {
   slots: Slot[] | undefined;
   version: number;
   colours: ColourOption[]; // for categories with colour options
+  colourColumn: boolean; // list view: keep a Colour column on every row
 };
 
 type ImageProps = { onOpenImage: (model: Row) => void };
@@ -624,6 +628,7 @@ function RequestSlots({
   slots: storedSlots,
   version,
   colours,
+  colourColumn,
   compact,
   onSaved,
   onRemoved,
@@ -663,6 +668,7 @@ function RequestSlots({
             takenScales={others.filter((c) => c.colour === mine.colour).map((c) => c.scale)}
             takenColours={others.filter((c) => c.scale === mine.scale).map((c) => c.colour)}
             colours={colours}
+            colourColumn={colourColumn}
             onSaved={onSaved}
             onRemoved={onRemoved}
             canRemove={i > 0 && !slot.line}
@@ -702,6 +708,7 @@ function LineEditor({
   takenScales,
   takenColours,
   colours,
+  colourColumn,
   onSaved,
   onRemoved,
   canRemove,
@@ -714,6 +721,7 @@ function LineEditor({
   takenScales: (string | null)[];
   takenColours: (string | null)[];
   colours: ColourOption[];
+  colourColumn: boolean;
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
   canRemove: boolean; // an extra, unsaved size line can be removed
@@ -740,7 +748,7 @@ function LineEditor({
   return (
     <div
       className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 ${
-        compact ? "" : model.hasColours ? XL_COLOUR_ROW : XL_PLAIN_ROW
+        compact ? "" : colourColumn ? XL_COLOUR_ROW : XL_PLAIN_ROW
       }`}
     >
       <div className={`col-span-3 text-sm text-neutral-600 ${wide}`}>
@@ -761,6 +769,8 @@ function LineEditor({
           </span>
         )}
       </div>
+      {/* No colour choice, but the list has a Colour column: keep its place. */}
+      {!model.hasColours && colourColumn && !compact && <div aria-hidden className="hidden xl:block" />}
       {model.hasColours && (
         <div className={`col-span-3 ${wide}`}>
           <ColourSelect

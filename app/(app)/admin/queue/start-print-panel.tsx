@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { startPrintJob, type PlateItem } from "@/app/actions/jobs";
-import { ColourChip } from "@/components/colour-chip";
+import { ColourLabel } from "@/components/colour-label";
 import { JobFields } from "@/components/job-fields";
 import { naturalCollator } from "@/lib/catalogue";
 import { emptyJobForm, type JobForm, type JobFormOptions } from "@/lib/jobs";
@@ -183,8 +183,8 @@ export function StartPrintPanel({
                   {r.name}
                   <span className="text-sm text-neutral-500"> · {scaleLabel(r.line.scale, r.defaultScale)}</span>
                   {r.colour && (
-                    <span className="ml-2 text-sm text-neutral-700">
-                      <ColourChip colour={r.colour.colour} name={r.colour.name} />
+                    <span className="ml-2 text-sm">
+                      <ColourLabel hex={r.colour.hex} name={r.colour.name} />
                     </span>
                   )}
                 </span>

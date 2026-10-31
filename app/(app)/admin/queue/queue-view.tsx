@@ -10,7 +10,7 @@ import {
   UrgencySelect,
 } from "@/components/request-fields";
 import type { JobFormOptions } from "@/lib/jobs";
-import { ColourChip } from "@/components/colour-chip";
+import { ColourLabel } from "@/components/colour-label";
 import { StartPrintPanel, type PickableModel } from "./start-print-panel";
 
 export type QueueRow = {
@@ -20,7 +20,7 @@ export type QueueRow = {
   categoryName: string;
   defaultScale: string | null;
   // The line's colour (null = any colour, or a category without colours).
-  colour: { colour: string; name: string } | null;
+  colour: { hex: string; name: string } | null;
   urgency: Urgency | null; // copy of line.urgency, used for sorting
 };
 
@@ -134,7 +134,9 @@ export function QueueView({
           <div
             className={`hidden gap-3 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase lg:grid ${COLUMNS}`}
           >
-            <span className="sr-only">On this plate</span>
+            {/* An empty cell over the tick boxes, so every heading sits over
+                its own column. (A visually hidden cell takes no space.) */}
+            <span aria-hidden />
             <span>Code</span>
             <span>Name</span>
             <span>Category</span>
@@ -226,8 +228,8 @@ function QueueLine({
         <span className="min-w-0 break-words">
           {row.name}
           {row.colour && (
-            <span className="ml-2 text-sm text-neutral-700">
-              <ColourChip colour={row.colour.colour} name={row.colour.name} />
+            <span className="ml-2 text-sm">
+              <ColourLabel hex={row.colour.hex} name={row.colour.name} />
             </span>
           )}
         </span>
@@ -259,6 +261,12 @@ function QueueLine({
         />
       </div>
       <div className="col-span-3 flex items-center gap-2 lg:col-span-1">
+        {/* The Plate column always keeps its place; a dash until ticked. */}
+        {!ticked && (
+          <span className="hidden w-full text-center text-neutral-300 lg:block" aria-hidden>
+            —
+          </span>
+        )}
         {ticked && (
           <>
             <label htmlFor={`plate-${id}`} className="text-sm text-neutral-600 lg:sr-only">

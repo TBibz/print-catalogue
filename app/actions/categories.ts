@@ -9,7 +9,6 @@ import type { Category } from "@/lib/catalogue";
 export type CategoryInput = {
   id: string | null; // null = a new category
   name: string;
-  sortOrder: string;
   hasColourOptions: boolean;
 };
 
@@ -20,20 +19,25 @@ export async function saveCategory(
 ): Promise<{ ok: true; category: Category } | Fail> {
   await requireAdmin();
   const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
-  const sortText = String(input.sortOrder ?? "").trim();
-  const sortOrder = sortText === "" ? 0 : Number(sortText);
 
   if (!name) return { ok: false, error: "Please enter a name." };
   if (name.length > 60) return { ok: false, error: "Names can be at most 60 characters." };
-  if (!Number.isInteger(sortOrder) || Math.abs(sortOrder) > 100000) {
-    return { ok: false, error: "The sort order must be a whole number, e.g. 10." };
-  }
 
   const supabase = await createClient();
-  const values = { name, sort_order: sortOrder, has_colour_options: Boolean(input.hasColourOptions) };
-  const query = input.id
-    ? supabase.from("categories").update(values).eq("id", input.id)
-    : supabase.from("categories").insert(values);
+  const values = { name, has_colour_options: Boolean(input.hasColourOptions) };
+  let query;
+  if (input.id) {
+    query = supabase.from("categories").update(values).eq("id", input.id);
+  } else {
+    // A new category goes at the end of the order.
+    const { data: last } = await supabase
+      .from("categories")
+      .select("sort_order")
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ sort_order: number }>();
+    query = supabase.from("categories").insert({ ...values, sort_order: (last?.sort_order ?? 0) + 1 });
+  }
   const { data, error } = await query
     .select("id, name, sort_order, has_colour_options")
     .maybeSingle<Category>();
@@ -57,6 +61,19 @@ export async function deleteCategory(id: string): Promise<{ ok: true } | Fail> {
       return { ok: false, error: "This category still has models, so it can't be deleted. Move them first." };
     }
     return { ok: false, error: "Couldn't delete. Please check your connection and try again." };
+  }
+  return { ok: true };
+}
+
+// Saves the order shown on the Categories page: positions 1, 2, 3… in the
+// order of `ids` (one database call, see 0011_colour_hex_category_order.sql).
+export async function reorderCategories(ids: string[]): Promise<{ ok: true } | Fail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reorder_categories", { p_ids: ids });
+  if (error) {
+    console.error("reorder_categories:", error.message);
+    return { ok: false, error: "Couldn't save the new order. Please try again." };
   }
   return { ok: true };
 }

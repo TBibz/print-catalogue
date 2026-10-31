@@ -11,6 +11,7 @@ import {
   type MaterialType,
 } from "@/lib/materials";
 import { MaterialEditor, MATERIAL_GRID } from "./material-editor";
+import { ColourLabel } from "@/components/colour-label";
 
 type Filter = "all" | MaterialType;
 type Editing = string | "new" | null;
@@ -182,9 +183,9 @@ export function MaterialsList({ materials: serverMaterials }: { materials: Mater
                       Colour option
                     </span>
                   )}
-                  {m.colour && m.colour !== m.name && (
-                    <span className="block text-xs text-neutral-500">{m.colour}</span>
-                  )}
+                  <span className="block text-sm">
+                    <ColourLabel hex={m.colour_hex} name={m.colour || m.name} />
+                  </span>
                   <span className="block text-xs text-neutral-500 md:hidden">
                     {TYPE_LABELS[m.type]} · {formatGBP(m.pack_cost)} for {Number(m.pack_size)}
                     {m.unit} · charge {formatGBP(m.charge_per_unit * 1000)} {per1000Label(m.unit)}

@@ -1,14 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { deleteCategory, saveCategory, type CategoryInput } from "@/app/actions/categories";
+import { useRef, useState, useTransition } from "react";
+import {
+  deleteCategory,
+  reorderCategories,
+  saveCategory,
+  type CategoryInput,
+} from "@/app/actions/categories";
 import { compareCategories, type Category } from "@/lib/catalogue";
 
-const GRID = "md:grid-cols-[minmax(0,1fr)_7rem_9rem_5rem_11rem]";
+const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_9rem_5rem_11rem]";
 const box =
   "h-11 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 
-// Every category is editable in place: change it and press Save.
+// Every category is editable in place: change it and press Save. The
+// order is changed by dragging the ⠿ handle (or with the ↑ ↓ buttons) and
+// saves straight away. The catalogue lists categories in this order.
 export function CategoriesList({
   categories: serverCategories,
   modelCounts,
@@ -16,33 +23,84 @@ export function CategoriesList({
   categories: Category[];
   modelCounts: Record<string, number>;
 }) {
-  const [categories, setCategories] = useState(serverCategories);
+  const [categories, setCategories] = useState(() => [...serverCategories].sort(compareCategories));
   const [adding, setAdding] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [, startTransition] = useTransition();
+  // Dragging: which row is being dragged, and the order before it started.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const orderBeforeDrag = useRef<string[]>([]);
 
   // Take fresh data when Next.js shows this kept-alive page again.
   const [synced, setSynced] = useState(serverCategories);
   if (serverCategories !== synced) {
     setSynced(serverCategories);
-    setCategories(serverCategories);
+    setCategories([...serverCategories].sort(compareCategories));
     setAdding(false);
   }
 
-  const sorted = [...categories].sort(compareCategories);
+  // Saves the order now on screen; puts the old one back if that fails.
+  function saveOrder(next: Category[], previous: Category[]) {
+    const ids = next.map((c) => c.id);
+    if (ids.join() === previous.map((c) => c.id).join()) return;
+    setMessage(null);
+    startTransition(async () => {
+      const result = await reorderCategories(ids);
+      if (!result.ok) {
+        setCategories(previous);
+        setMessage({ ok: false, text: result.error });
+        return;
+      }
+      setCategories(next.map((c, i) => ({ ...c, sort_order: i + 1 })));
+      setMessage({ ok: true, text: "Order saved ✓" });
+    });
+  }
+
+  function move(index: number, by: -1 | 1) {
+    const target = index + by;
+    if (target < 0 || target >= categories.length) return;
+    const next = [...categories];
+    [next[index], next[target]] = [next[target], next[index]];
+    setCategories(next);
+    saveOrder(next, categories);
+  }
+
+  // While dragging over another row, the dragged row moves into its place.
+  function dragOver(overId: string) {
+    if (!dragId || dragId === overId) return;
+    setCategories((prev) => {
+      const from = prev.findIndex((c) => c.id === dragId);
+      const to = prev.findIndex((c) => c.id === overId);
+      if (from < 0 || to < 0) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  function dragEnd() {
+    if (!dragId) return;
+    setDragId(null);
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    const previous = orderBeforeDrag.current.flatMap((id) => byId.get(id) ?? []);
+    saveOrder(categories, previous);
+  }
 
   function handleSaved(saved: Category, isNew: boolean) {
     setCategories((prev) =>
       prev.some((c) => c.id === saved.id) ? prev.map((c) => (c.id === saved.id ? saved : c)) : [...prev, saved],
     );
-    setMessage(`${isNew ? "Added" : "Saved"} ${saved.name} ✓`);
+    setMessage({ ok: true, text: `${isNew ? "Added" : "Saved"} ${saved.name} ✓` });
     if (isNew) setAdding(false);
   }
 
   return (
     <div className="max-w-4xl">
       <p className="mb-4 text-sm text-neutral-600">
-        The catalogue lists categories by sort order (lowest first), then by name. Leave the sort
-        order at 0 for plain A→Z. Categories with colour options let each request choose a colour.
+        Drag a category by its ⠿ handle (or use ↑ ↓) to change the order. The catalogue sidebar and
+        the “All” list follow this order. Categories with colour options let each request choose a
+        colour.
       </p>
 
       <div className="mb-4 flex justify-end">
@@ -60,8 +118,11 @@ export function CategoriesList({
       </div>
 
       {message && (
-        <p role="status" className="mb-3 rounded-md bg-green-50 px-3 py-2 text-green-800">
-          {message}
+        <p
+          role={message.ok ? "status" : "alert"}
+          className={`mb-3 rounded-md px-3 py-2 ${message.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}
+        >
+          {message.text}
         </p>
       )}
 
@@ -69,8 +130,8 @@ export function CategoriesList({
         <div
           className={`hidden gap-3 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase md:grid ${GRID}`}
         >
+          <span>Order</span>
           <span>Name</span>
-          <span>Sort order</span>
           <span>Colour options</span>
           <span className="text-right">Models</span>
           <span />
@@ -86,20 +147,30 @@ export function CategoriesList({
               onCancelNew={() => setAdding(false)}
             />
           )}
-          {sorted.map((c) => (
+          {categories.map((c, i) => (
             <CategoryRow
               key={c.id}
               category={c}
               modelCount={modelCounts[c.id] ?? 0}
+              position={i}
+              total={categories.length}
+              dragging={dragId === c.id}
+              onMove={(by) => move(i, by)}
+              onDragStart={() => {
+                orderBeforeDrag.current = categories.map((x) => x.id);
+                setDragId(c.id);
+              }}
+              onDragOver={() => dragOver(c.id)}
+              onDragEnd={dragEnd}
               onSaved={(saved) => handleSaved(saved, false)}
               onDeleted={() => {
                 setCategories((prev) => prev.filter((x) => x.id !== c.id));
-                setMessage(`Deleted ${c.name}`);
+                setMessage({ ok: true, text: `Deleted ${c.name}` });
               }}
             />
           ))}
         </ul>
-        {sorted.length === 0 && !adding && (
+        {categories.length === 0 && !adding && (
           <p className="py-12 text-center text-neutral-500">No categories yet.</p>
         )}
       </div>
@@ -110,32 +181,45 @@ export function CategoriesList({
 function CategoryRow({
   category,
   modelCount,
+  position = 0,
+  total = 0,
+  dragging = false,
+  onMove,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
   onSaved,
   onDeleted,
   onCancelNew,
 }: {
   category: Category | null; // null = adding a new one
   modelCount: number;
+  position?: number;
+  total?: number;
+  dragging?: boolean;
+  onMove?: (by: -1 | 1) => void;
+  onDragStart?: () => void;
+  onDragOver?: () => void;
+  onDragEnd?: () => void;
   onSaved: (category: Category) => void;
   onDeleted: () => void;
   onCancelNew?: () => void;
 }) {
-  const initial: CategoryInput = {
+  const [values, setValues] = useState<CategoryInput>({
     id: category?.id ?? null,
     name: category?.name ?? "",
-    sortOrder: String(category?.sort_order ?? 0),
     hasColourOptions: category?.has_colour_options ?? false,
-  };
-  const [values, setValues] = useState(initial);
+  });
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // The row can only be dragged by its handle, not from the name box.
+  const [handleHeld, setHandleHeld] = useState(false);
   const [pending, startTransition] = useTransition();
   const label = category?.name || "new category";
 
   const dirty =
     !category ||
     values.name.trim() !== category.name ||
-    values.sortOrder.trim() !== String(category.sort_order) ||
     values.hasColourOptions !== category.has_colour_options;
 
   function save() {
@@ -147,7 +231,6 @@ function CategoryRow({
       setValues({
         id: result.category.id,
         name: result.category.name,
-        sortOrder: String(result.category.sort_order),
         hasColourOptions: result.category.has_colour_options,
       });
     });
@@ -164,8 +247,29 @@ function CategoryRow({
     });
   }
 
+  const arrow =
+    "flex h-9 w-9 items-center justify-center rounded-md border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-white";
+
   return (
-    <li className={`border-b border-neutral-100 px-3 py-3 ${category ? "" : "bg-neutral-50"}`}>
+    <li
+      draggable={Boolean(category) && handleHeld}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart?.();
+      }}
+      onDragOver={(e) => {
+        e.preventDefault(); // allows dropping here
+        onDragOver?.();
+      }}
+      onDrop={(e) => e.preventDefault()}
+      onDragEnd={() => {
+        setHandleHeld(false);
+        onDragEnd?.();
+      }}
+      className={`border-b border-neutral-100 px-3 py-3 ${category ? "" : "bg-neutral-50"} ${
+        dragging ? "bg-neutral-100 opacity-60" : ""
+      }`}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -174,6 +278,39 @@ function CategoryRow({
         noValidate
         className={`grid grid-cols-2 items-center gap-3 ${GRID}`}
       >
+        {category ? (
+          <div className="col-span-2 flex items-center gap-1 md:col-span-1">
+            <span
+              aria-hidden
+              title="Drag to reorder"
+              onMouseDown={() => setHandleHeld(true)}
+              onMouseUp={() => setHandleHeld(false)}
+              className="flex h-9 w-6 cursor-grab items-center justify-center text-lg text-neutral-400 select-none hover:text-neutral-700 active:cursor-grabbing"
+            >
+              ⠿
+            </span>
+            <button
+              type="button"
+              onClick={() => onMove?.(-1)}
+              disabled={position === 0}
+              aria-label={`Move ${label} up`}
+              className={arrow}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove?.(1)}
+              disabled={position === total - 1}
+              aria-label={`Move ${label} down`}
+              className={arrow}
+            >
+              ↓
+            </button>
+          </div>
+        ) : (
+          <span className="col-span-2 text-sm text-neutral-500 md:col-span-1">Goes last</span>
+        )}
         <input
           aria-label={`Name of ${label}`}
           placeholder="Category name"
@@ -183,16 +320,6 @@ function CategoryRow({
           onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
           className={`${box} col-span-2 md:col-span-1`}
         />
-        <label className="text-sm text-neutral-600 md:contents">
-          <span className="mb-1 block md:hidden">Sort order</span>
-          <input
-            aria-label={`Sort order of ${label}`}
-            inputMode="numeric"
-            value={values.sortOrder}
-            onChange={(e) => setValues((v) => ({ ...v, sortOrder: e.target.value.replace(/[^0-9-]/g, "") }))}
-            className={`${box} text-center tabular-nums`}
-          />
-        </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input
             type="checkbox"

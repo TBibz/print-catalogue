@@ -15,6 +15,8 @@ import {
   type Material,
   type MaterialType,
 } from "@/lib/materials";
+import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
+import { ColourLabel } from "@/components/colour-label";
 
 // Column widths shared by the list rows and the editor (md screens and up).
 export const MATERIAL_GRID =
@@ -32,6 +34,7 @@ function inputFrom(m: Material | null): MaterialInput {
     type: m?.type ?? "fdm",
     name: m?.name ?? "",
     colour: m?.colour ?? "",
+    colourHex: m?.colour_hex ?? DEFAULT_COLOUR_HEX,
     packSize: m ? num(m.pack_size) : "1000",
     packCost: m ? Number(m.pack_cost).toFixed(2) : "",
     chargePer1000: m ? (m.charge_per_unit * 1000).toFixed(2) : "",
@@ -266,15 +269,29 @@ export function MaterialEditor({
             <label htmlFor="mat-colour" className="mb-2 block text-sm font-medium text-neutral-700">
               Colour
             </label>
-            <input
-              id="mat-colour"
-              value={values.colour}
-              onChange={(e) => set("colour", e.target.value)}
-              placeholder="e.g. Black"
-              autoComplete="off"
-              className={`${box} max-w-xs text-sm`}
-            />
+            <div className="flex max-w-xs items-center gap-2">
+              <input
+                type="color"
+                aria-label="Pick the colour"
+                value={values.colourHex}
+                onChange={(e) => set("colourHex", e.target.value)}
+                className="h-11 w-14 shrink-0 cursor-pointer rounded-md border border-neutral-300 bg-white p-1"
+              />
+              <input
+                id="mat-colour"
+                value={values.colour}
+                onChange={(e) => set("colour", e.target.value)}
+                placeholder="Colour name, e.g. Black"
+                autoComplete="off"
+                className={`${box} text-sm`}
+              />
+            </div>
+            <p className="mt-2 text-sm text-neutral-600">
+              Shown as:{" "}
+              <ColourLabel hex={values.colourHex} name={values.colour.trim() || values.name.trim() || "Colour"} />
+            </p>
             {fieldError("colour")}
+            {fieldError("colourHex")}
             <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm">
               <input
                 type="checkbox"

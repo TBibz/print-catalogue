@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (Phase 6b: colours, categories, notepad count)_
+_Last updated: 2026-10-31 (colour stripes, category order, table alignment)_
 
 ## Phases
 
@@ -71,6 +71,16 @@ _Last updated: 2026-10-31 (Phase 6b: colours, categories, notepad count)_
 - Queue and jobs: colour swatch and name next to items; on the Centauri, a plate whose coloured items all share one colour pre-selects that filament
 - Queue: "N unticked notepad notes" linking to /notepad (blank lines aren't counted)
 
+### Fixes before Phase 7: Done (needs `0011` run)
+- `0011_colour_hex_category_order.sql`: `materials.colour_hex` (filled in once from the old name mapping, unknown names grey), `colour_options` now includes `colour_hex` and lists out-of-stock offered colours too, categories get positions 1, 2, 3… (A→Z the first time), `reorder_categories()`. Checked in PGlite, including running it twice
+- One colour style everywhere (`components/colour-label.tsx`): a 6px stripe of the true colour beside the name; light colours get a grey outline worked out from the hex. Used in the catalogue dropdown (stripe inside the box), queue, start print panel, jobs and materials. The old dot and the name-based colour lookup are gone
+- Materials: colour picker in the editor, stripe in the list
+- Colour dropdown lists every offered colour; out-of-stock ones are greyed out with "(out of stock)" and can't be picked unless the line already uses it
+- Categories: drag-and-drop order with ↑ ↓ buttons, saved immediately; new categories go last
+- Why "sort order 1" went to the bottom: every category was at 0 and the order is "lowest first", so 1 sorted after all of them. (The 6b checklist said it would go to the top, which was wrong.) Fixed by giving every category its own position
+- Queue headings: the tick-box heading cell was visually hidden (`sr-only`), which takes it out of the grid, so every heading shifted one column left. Now an empty cell; the Plate column shows "—" until ticked
+- Catalogue headings: in mixed lists, base rows had an extra Colour column. Now every row keeps a Colour column whenever any row shown has colours. Jobs, models, materials, printers and categories headings were checked and already matched
+
 ### 7. Money and stats: Not started
 ### 8. Polish: Not started
 
@@ -90,6 +100,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0008_print_jobs.sql` | 6a | print jobs, items, printing views, request guard, job RPC functions | ☐ |
 | `0009_delete_print_job.sql` | 6a | `delete_print_job` (reverts a completed job first) | ☐ |
 | `0010_colours.sql` | 6b | colours on request lines and job items, `colour_options` view, colour checks, BASES colours | ☐ |
+| `0011_colour_hex_category_order.sql` | 6b | `materials.colour_hex`, `colour_options` with hex and out-of-stock colours, category positions, `reorder_categories()` | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -103,7 +114,8 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - Cancelled jobs can't be reverted.
 - None of the Phase 6a/6b screens or UI fixes have been checked in a browser yet (Claude can't log in). Lint and the build pass.
 - Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
-- Swatch colours come from the material's colour name (common names mapped by hand). An unusual name may show an empty swatch: rename the colour or add it to `lib/colours.ts`.
+- Drag-and-drop on the Categories page needs a mouse; on a phone or tablet use the ↑ ↓ buttons.
+- In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 
 **Decisions made along the way**
 - Request lines are shared by both accounts (no per-user owner), hence "Show all current requests".
@@ -117,7 +129,8 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - `my_cost` has its own `my_cost_overridden` flag (not in the original brief), so a hand-typed cost isn't recalculated over.
 - A partly successful job is charged in full; jobs where nothing succeeded, and cancelled jobs, are charged 0 unless set by hand.
 - Job RPCs are `security definer` with an admin check at the top; helper functions are not callable by the app.
-- Colours are set per category (has_colour_options), not per model. The list of colours is every filament with "Offer as colour" ticked and in stock.
+- Colours are set per category (has_colour_options), not per model. The list of colours is every filament with "Offer as colour" ticked (out-of-stock ones greyed out).
+- `materials.colour_hex` is the only source of a material's displayed colour.
 - When a request line is recreated (edit result, revert, delete), it keeps its colour even if that colour is now out of stock: `pj_put_back` sets a transaction-only flag that the colour check respects.
 
 **Bugs fixed (for reference)**

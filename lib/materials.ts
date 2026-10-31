@@ -30,6 +30,7 @@ export type Material = {
   type: MaterialType;
   name: string;
   colour: string;
+  colour_hex: string; // e.g. "#111111", picked on the Materials page
   unit: MaterialUnit;
   pack_size: number;
   pack_cost: number;
@@ -44,7 +45,7 @@ export type Material = {
 };
 
 export const MATERIAL_COLUMNS =
-  "id, type, name, colour, unit, pack_size, pack_cost, cost_per_unit, charge_per_unit, charge_overridden, in_stock, offer_as_colour, active, created_at, updated_at";
+  "id, type, name, colour, colour_hex, unit, pack_size, pack_cost, cost_per_unit, charge_per_unit, charge_overridden, in_stock, offer_as_colour, active, created_at, updated_at";
 
 // The charge a material gets unless it's set by hand (see 0006 migration).
 export const DEFAULT_CHARGE_MULTIPLIER = 2;

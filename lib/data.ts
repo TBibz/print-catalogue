@@ -163,7 +163,7 @@ export async function loadModelCountsByCategory(supabase: SupabaseClient) {
 export async function loadColourOptions(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("colour_options")
-    .select("id, name, colour, available, in_stock")
+    .select("id, name, colour, colour_hex, available, in_stock")
     .order("name")
     .returns<ColourOption[]>();
   if (error) throw new Error(error.message);

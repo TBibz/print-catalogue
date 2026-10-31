@@ -11,7 +11,7 @@ import {
   type JobResult,
   type Results,
 } from "@/app/actions/jobs";
-import { ColourChip } from "@/components/colour-chip";
+import { ColourLabel } from "@/components/colour-label";
 import { JobFields } from "@/components/job-fields";
 import {
   finishedAt,
@@ -321,7 +321,7 @@ export function JobsView({
 // An item's colour, from the materials list (null = any colour / none).
 function colourOf(item: JobItem, options: JobFormOptions) {
   const m = item.colour_material_id ? options.materials.find((x) => x.id === item.colour_material_id) : undefined;
-  return m ? { colour: m.colour, name: m.colour || m.name } : null;
+  return m ? { hex: m.colour_hex, name: m.colour || m.name } : null;
 }
 
 function ItemColour({ item, options }: { item: JobItem; options: JobFormOptions }) {
@@ -329,7 +329,7 @@ function ItemColour({ item, options }: { item: JobItem; options: JobFormOptions 
   if (!colour) return null;
   return (
     <span className="ml-2">
-      <ColourChip colour={colour.colour} name={colour.name} />
+      <ColourLabel hex={colour.hex} name={colour.name} />
     </span>
   );
 }
