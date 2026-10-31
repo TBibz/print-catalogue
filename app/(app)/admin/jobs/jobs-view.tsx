@@ -472,8 +472,14 @@ function ResultForm({
     ),
   );
   const { error, pending, run } = useRun(onDone);
-  const setAll = (pick: (planned: number) => number) =>
-    setValues(Object.fromEntries(job.print_job_items.map((i) => [i.id, String(pick(i.quantity_planned))])));
+  // "All succeeded" / "All failed": fill every item (planned or 0) and
+  // apply it straight away, exactly as if those numbers had been typed and
+  // the main button pressed.
+  function submitAll(pick: (planned: number) => number) {
+    const results: Results = Object.fromEntries(job.print_job_items.map((i) => [i.id, pick(i.quantity_planned)]));
+    setValues(Object.fromEntries(Object.entries(results).map(([id, n]) => [id, String(n)])));
+    run(() => onSubmit(results));
+  }
 
   function submit() {
     const results: Results = {};
@@ -496,18 +502,21 @@ function ResultForm({
         <span className="mr-2 font-medium">How many succeeded?</span>
         <button
           type="button"
-          onClick={() => setAll((p) => p)}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100"
+          onClick={() => submitAll((p) => p)}
+          disabled={pending}
+          className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-sm text-green-800 hover:bg-green-50 disabled:opacity-40"
         >
           All succeeded
         </button>
         <button
           type="button"
-          onClick={() => setAll(() => 0)}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100"
+          onClick={() => submitAll(() => 0)}
+          disabled={pending}
+          className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40"
         >
           All failed
         </button>
+        <span className="text-sm text-neutral-500">These save straight away. Or type the numbers below.</span>
       </div>
       <ul className="space-y-2">
         {job.print_job_items.map((item) => {
