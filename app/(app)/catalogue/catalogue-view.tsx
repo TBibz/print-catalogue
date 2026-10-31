@@ -447,6 +447,10 @@ type ModelItemProps = SlotCallbacks & {
 type ImageProps = { onOpenImage: (model: Row) => void };
 
 const PREVIEW_SIZE = 288; // px, the hover preview box
+
+// Light gold for NEW models' rows and cards (takes priority over the
+// alternating grey).
+const NEW_ROW = "bg-amber-100/70";
 const PREVIEW_GAP = 20; // px between the pointer and the preview
 
 // memo: a row only re-renders when its own slots change, which keeps
@@ -459,6 +463,7 @@ const ModelRow = memo(function ModelRow({
   ...callbacks
 }: ModelItemProps & ImageProps) {
   const comingSoon = model.availability === "coming_soon";
+  const isNew = showNewBadge(model, model.printedTotal);
   const url = imageUrl(model.image_path);
   // Where the pointer is while hovering the code/name (null = not hovering).
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
@@ -478,8 +483,13 @@ const ModelRow = memo(function ModelRow({
     : {};
 
   return (
-    // Every other row has a very light grey background, like a spreadsheet.
-    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-neutral-100 px-3 py-2.5 even:bg-neutral-50 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-x-4 xl:py-1.5">
+    // Every other row has a very light grey background, like a spreadsheet;
+    // NEW models get a light gold row instead, like the old sheet.
+    <li
+      className={`grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-neutral-100 px-3 py-2.5 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-x-4 xl:py-1.5 ${
+        isNew ? NEW_ROW : "even:bg-neutral-50"
+      }`}
+    >
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
         className={`font-mono text-sm leading-5 xl:pt-[7px] ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
@@ -548,7 +558,11 @@ const ModelCard = memo(function ModelCard({
   const comingSoon = model.availability === "coming_soon";
 
   return (
-    <li className="flex flex-col rounded-lg border border-neutral-200 bg-white">
+    <li
+      className={`flex flex-col rounded-lg border ${
+        showNewBadge(model, model.printedTotal) ? `border-amber-200 ${NEW_ROW}` : "border-neutral-200 bg-white"
+      }`}
+    >
       <div className="flex aspect-square items-center justify-center overflow-hidden rounded-t-lg border-b border-neutral-100 bg-white">
         {url ? (
           <button
