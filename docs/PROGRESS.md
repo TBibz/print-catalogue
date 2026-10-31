@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (colour stripes, category order, table alignment)_
+_Last updated: 2026-10-31 (catalogue colour box padding and column widths)_
 
 ## Phases
 
@@ -81,6 +81,11 @@ _Last updated: 2026-10-31 (colour stripes, category order, table alignment)_
 - Queue headings: the tick-box heading cell was visually hidden (`sr-only`), which takes it out of the grid, so every heading shifted one column left. Now an empty cell; the Plate column shows "—" until ticked
 - Catalogue headings: in mixed lists, base rows had an extra Colour column. Now every row keeps a Colour column whenever any row shown has colours. Jobs, models, materials, printers and categories headings were checked and already matched
 
+### Catalogue row fixes: Done
+- Colour dropdown: the stripe covered the first letter because the box's own `px-2.5` padding won over the extra left padding (and some browsers ignore padding on a native-looking `<select>`). Size and colour dropdowns now draw their own arrow (`appearance-none`) and set left/right padding separately; with a stripe the text starts after it with a 6px gap, "Any colour" keeps the normal padding. Fixed in `components/request-fields.tsx`, so grid view is fixed too
+- Column widths (xl): Code 5rem, Size 5.5rem, Colour 12.5rem (fits "Sky Blue (out of stock)"), Qty 4rem, Urgency 7rem, Note takes the rest (about 15rem at 1280px, the widest). The status column is gone: "Saving…" / "Saved ✓" show inside the Note box, and errors / "N requested · M printing" / Remove on a line underneath
+- Checked with sample data in the browser pane at 1280px (list and grid view), using a temporary preview page that wasn't committed
+
 ### 7. Money and stats: Not started
 ### 8. Polish: Not started
 
@@ -116,6 +121,7 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
 - Drag-and-drop on the Categories page needs a mouse; on a phone or tablet use the ↑ ↓ buttons.
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
+- Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
 
 **Decisions made along the way**
 - Request lines are shared by both accounts (no per-user owner), hence "Show all current requests".

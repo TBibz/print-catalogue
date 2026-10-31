@@ -10,7 +10,34 @@ import type { SaveStatus } from "@/lib/use-line-autosave";
 // quantity, urgency, note and size boxes line up.
 const ROW_HEIGHT = "h-11";
 
-const box = `${ROW_HEIGHT} rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900`;
+// Border, height and focus ring, without horizontal padding: each control
+// sets its own left/right padding (mixing px- with pl-/pr- on one element
+// lets whichever comes later in the CSS win, which is how the colour
+// stripe ended up over the text).
+const frame = `${ROW_HEIGHT} rounded-md border border-neutral-300 bg-white py-2 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900`;
+const box = `${frame} px-2.5 text-base`;
+
+// Size and colour dropdowns draw their own arrow (appearance-none), because
+// some browsers ignore the padding of a native-looking <select>.
+const selectBox = `${frame} w-full cursor-pointer appearance-none pr-8 text-sm disabled:cursor-not-allowed disabled:bg-neutral-100`;
+
+// Left padding of a dropdown's text: normal, or after a colour stripe
+// (10px in, 6px stripe, 6px gap, the same spacing as ColourLabel).
+const TEXT_LEFT = "pl-2.5";
+const TEXT_LEFT_AFTER_STRIPE = "pl-[1.375rem]";
+const STRIPE_LEFT = "left-2.5";
+
+function SelectArrow() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-neutral-500"
+    >
+      <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
 
 export function QuantityInput({
   value,
@@ -86,11 +113,13 @@ export function NoteInput({
   label,
   onChange,
   onBlur,
+  roomOnRight = false,
 }: {
   value: string;
   label: string;
   onChange: (value: string) => void;
   onBlur: () => void;
+  roomOnRight?: boolean; // leave space for "Saved ✓" shown inside the box
 }) {
   return (
     <input
@@ -104,7 +133,7 @@ export function NoteInput({
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
       }}
-      className={`${box} w-full`}
+      className={`${frame} w-full pl-2.5 text-base ${roomOnRight ? "pr-20" : "pr-2.5"}`}
     />
   );
 }
@@ -127,20 +156,23 @@ export function ScaleSelect({
   locked?: boolean; // true while some are printing: the size can't change
 }) {
   return (
-    <select
-      aria-label={label}
-      value={value ?? ""}
-      disabled={locked}
-      title={locked ? "Some are being printed, so the size can't be changed" : undefined}
-      onChange={(e) => onChange(e.target.value || null)}
-      className={`${box} w-full cursor-pointer text-sm disabled:cursor-not-allowed disabled:bg-neutral-100`}
-    >
-      {options.map((s) => (
-        <option key={s ?? ""} value={s ?? ""} disabled={disabledOptions.includes(s)}>
-          {scaleLabel(s, defaultScale)}
-        </option>
-      ))}
-    </select>
+    <div className="relative">
+      <select
+        aria-label={label}
+        value={value ?? ""}
+        disabled={locked}
+        title={locked ? "Some are being printed, so the size can't be changed" : undefined}
+        onChange={(e) => onChange(e.target.value || null)}
+        className={`${selectBox} ${TEXT_LEFT}`}
+      >
+        {options.map((s) => (
+          <option key={s ?? ""} value={s ?? ""} disabled={disabledOptions.includes(s)}>
+            {scaleLabel(s, defaultScale)}
+          </option>
+        ))}
+      </select>
+      <SelectArrow />
+    </div>
   );
 }
 
@@ -168,7 +200,7 @@ export function ColourSelect({
   return (
     <div className="relative">
       {current && (
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+        <span className={`pointer-events-none absolute inset-y-0 ${STRIPE_LEFT} flex items-center`}>
           <ColourStripe hex={current.colour_hex} />
         </span>
       )}
@@ -178,10 +210,9 @@ export function ColourSelect({
         disabled={locked}
         title={locked ? "Some are being printed, so the colour can't be changed" : undefined}
         onChange={(e) => onChange(e.target.value || null)}
-        // Inline style so the room for the stripe always wins over the
-        // box's own padding.
-        style={current ? { paddingLeft: "1.75rem" } : undefined}
-        className={`${box} w-full cursor-pointer text-sm disabled:cursor-not-allowed disabled:bg-neutral-100`}
+        // With a stripe, the text starts after it; "Any colour" keeps the
+        // normal padding, so text lines up with the other boxes.
+        className={`${selectBox} ${current ? TEXT_LEFT_AFTER_STRIPE : TEXT_LEFT}`}
       >
         <option value="" disabled={disabledOptions.includes(null)}>
           {ANY_COLOUR}
@@ -200,6 +231,7 @@ export function ColourSelect({
           );
         })}
       </select>
+      <SelectArrow />
     </div>
   );
 }

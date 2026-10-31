@@ -362,7 +362,7 @@ export function CatalogueView({
       ) : (
         <div className="border-t border-neutral-200">
           {/* Column headings (laptop/desktop only) */}
-          <div className="hidden grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid">
+          <div className="hidden grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid">
             <span>Code</span>
             <span>Name</span>
             <span className={`grid gap-2 ${colourHeader ? COLOUR_ROW : PLAIN_ROW}`}>
@@ -371,7 +371,6 @@ export function CatalogueView({
               <span className="text-center">Qty</span>
               <span>Urgency</span>
               <span>Note</span>
-              <span />
             </span>
           </div>
           <ul>
@@ -474,7 +473,7 @@ const ModelRow = memo(function ModelRow({
     : {};
 
   return (
-    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 xl:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] xl:items-start xl:gap-4 xl:py-3">
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-4 xl:py-3">
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
         className={`pt-2 font-mono text-sm ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
@@ -615,11 +614,16 @@ function ImageIcon() {
 
 // The one-line (xl) layout of a request row: size, [colour,] qty, urgency,
 // note, status.
-const PLAIN_ROW = "grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
-const COLOUR_ROW = "grid-cols-[6rem_9rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
+// The Note box takes whatever is left, so it's always the widest. The Colour
+// box fits a long colour name plus "(out of stock)" (e.g. "Sky Blue (out of
+// stock)"); longer names are cut off in the box but shown in full when open.
+// "Saved ✓" shows inside the Note box, and longer messages (errors,
+// "N requested · M printing") on a line underneath, so they need no column.
+const PLAIN_ROW = "grid-cols-[5.5rem_4rem_7rem_minmax(0,1fr)]";
+const COLOUR_ROW = "grid-cols-[5.5rem_12.5rem_4rem_7rem_minmax(0,1fr)]";
 // The same with the xl: prefix, written out in full so Tailwind finds them.
-const XL_PLAIN_ROW = "xl:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
-const XL_COLOUR_ROW = "xl:grid-cols-[6rem_9rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
+const XL_PLAIN_ROW = "xl:grid-cols-[5.5rem_4rem_7rem_minmax(0,1fr)]";
+const XL_COLOUR_ROW = "xl:grid-cols-[5.5rem_12.5rem_4rem_7rem_minmax(0,1fr)]";
 
 // All the request lines for one model, plus "+ another size" and (for
 // categories with colours) "+ another colour".
@@ -743,7 +747,11 @@ function LineEditor({
   const wide = compact ? "" : "xl:col-span-1";
   // Size and colour can't change while some are printing (the database
   // refuses too).
-  const locked = (slot.line?.printing ?? 0) > 0;
+  const printing = slot.line?.printing ?? 0;
+  const locked = printing > 0;
+  const quickStatus = status.kind === "saving" || status.kind === "saved";
+  const slowStatus = status.kind === "error" || status.kind === "hint";
+  const showRemove = canRemove && status.kind !== "saving";
 
   return (
     <div
@@ -794,31 +802,46 @@ function LineEditor({
         value={fields.urgency}
         onChange={(v) => update("urgency", v, "now")}
       />
-      <div className={`col-span-3 ${wide}`}>
+      <div className={`relative col-span-3 ${wide}`}>
         <NoteInput
           label={`Note for ${what}`}
           value={fields.note}
           onChange={(v) => update("note", v)}
           onBlur={commit}
+          roomOnRight={quickStatus}
         />
-      </div>
-      <div className={`col-span-3 min-h-5 text-sm ${wide}`}>
-        <SaveStatusText status={status} onRetry={retry} />
-        {status.kind === "idle" && slot.line && slot.line.printing > 0 && (
-          <span className="text-neutral-600">
-            {slot.line.quantity} requested · {slot.line.printing} printing
+        {/* "Saving…" / "Saved ✓" sit inside the box, so the row never jumps. */}
+        {quickStatus && (
+          <span
+            aria-live="polite"
+            className={`pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs ${
+              status.kind === "saved" ? "text-green-700" : "text-neutral-500"
+            }`}
+          >
+            {status.kind === "saved" ? "Saved ✓" : "Saving…"}
           </span>
         )}
-        {canRemove && status.kind !== "saving" && (
-          <button
-            type="button"
-            onClick={() => onRemoved(model.id, slot.key)}
-            className="ml-2 text-neutral-500 underline hover:text-neutral-900"
-          >
-            Remove
-          </button>
-        )}
       </div>
+      {/* Messages that stay (errors, printing, Remove) get a line underneath. */}
+      {(slowStatus || printing > 0 || showRemove) && (
+        <div className="col-span-3 text-sm xl:col-span-full">
+          {slowStatus && <SaveStatusText status={status} onRetry={retry} />}
+          {printing > 0 && slot.line && (
+            <span className={`text-neutral-600 ${slowStatus ? "ml-2" : ""}`}>
+              {slot.line.quantity} requested · {printing} printing
+            </span>
+          )}
+          {showRemove && (
+            <button
+              type="button"
+              onClick={() => onRemoved(model.id, slot.key)}
+              className="ml-2 text-neutral-500 underline hover:text-neutral-900 first:ml-0"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
