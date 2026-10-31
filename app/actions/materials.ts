@@ -17,9 +17,9 @@ import {
 type Fail = { ok: false; error: string; field?: string };
 const TYPES: MaterialType[] = ["resin", "fdm"];
 
-// Something else (e.g. a print job, from Phase 6) still uses it.
+// Something else (a print job, or a request in this colour) still uses it.
 const IN_USE =
-  "This is used by print jobs, so it can't be deleted. Retire it instead.";
+  "This is used by print jobs or requests, so it can't be deleted. Retire it instead.";
 
 function friendly(error: { code?: string; message: string }, what: string): Fail {
   console.error(`${what}:`, error.message);

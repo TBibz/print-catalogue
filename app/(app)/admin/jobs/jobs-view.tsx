@@ -11,6 +11,7 @@ import {
   type JobResult,
   type Results,
 } from "@/app/actions/jobs";
+import { ColourChip } from "@/components/colour-chip";
 import { JobFields } from "@/components/job-fields";
 import {
   finishedAt,
@@ -20,6 +21,7 @@ import {
   printTime,
   type Job,
   type JobForm,
+  type JobItem,
   type JobFormOptions,
 } from "@/lib/jobs";
 import { formatGBP } from "@/lib/materials";
@@ -204,7 +206,12 @@ export function JobsView({
                       <span className="col-start-1 min-w-0 md:col-start-auto">
                         {job.title && <span className="block font-medium">{job.title}</span>}
                         <span className="block text-sm break-words">
-                          {job.print_job_items.map((i) => `${i.quantity_planned}× ${itemLabel(i)}`).join(", ")}
+                          {job.print_job_items
+                            .map((i) => {
+                              const colour = colourOf(i, options);
+                              return `${i.quantity_planned}× ${itemLabel(i)}${colour ? ` – ${colour.name}` : ""}`;
+                            })
+                            .join(", ")}
                         </span>
                         {job.status === "cancelled" && (
                           <span
@@ -311,6 +318,22 @@ export function JobsView({
   );
 }
 
+// An item's colour, from the materials list (null = any colour / none).
+function colourOf(item: JobItem, options: JobFormOptions) {
+  const m = item.colour_material_id ? options.materials.find((x) => x.id === item.colour_material_id) : undefined;
+  return m ? { colour: m.colour, name: m.colour || m.name } : null;
+}
+
+function ItemColour({ item, options }: { item: JobItem; options: JobFormOptions }) {
+  const colour = colourOf(item, options);
+  if (!colour) return null;
+  return (
+    <span className="ml-2">
+      <ColourChip colour={colour.colour} name={colour.name} />
+    </span>
+  );
+}
+
 const jobName = (job: Job) => job.title || `the job started ${formatDate(job.started_at)}`;
 
 // Everything about one job, read-only.
@@ -344,6 +367,7 @@ function JobSummary({ job, printerName, options }: { job: Job; printerName: stri
               {item.quantity_planned}×
             </span>{" "}
             {itemLabel(item)}
+            <ItemColour item={item} options={options} />
             {!item.from_request && item.models && (
               <span className="ml-1 text-xs text-neutral-500">(not requested)</span>
             )}

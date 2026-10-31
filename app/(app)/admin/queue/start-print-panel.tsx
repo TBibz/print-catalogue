@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { startPrintJob, type PlateItem } from "@/app/actions/jobs";
+import { ColourChip } from "@/components/colour-chip";
 import { JobFields } from "@/components/job-fields";
 import { naturalCollator } from "@/lib/catalogue";
 import { emptyJobForm, type JobForm, type JobFormOptions } from "@/lib/jobs";
@@ -52,13 +53,28 @@ export function StartPrintPanel({
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
+  // true once the filament has been chosen by hand, so it's left alone.
+  const [materialChosen, setMaterialChosen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const hasItems = plateRows.length > 0 || extras.length > 0;
   const update = (patch: Partial<JobForm>) => {
+    // A material change on its own (not from switching printer) is a choice.
+    if ("materialId" in patch && !("printerId" in patch)) setMaterialChosen(true);
     setForm((f) => ({ ...f, ...patch }));
     setError(null);
   };
+
+  // On a filament printer, if every coloured item on the plate is the same
+  // colour, pre-select that filament (it can still be changed).
+  const plateColours = new Set(
+    plateRows.flatMap((r) => (r.line.colour_material_id ? [r.line.colour_material_id] : [])),
+  );
+  const sharedColour = plateColours.size === 1 ? [...plateColours][0] : null;
+  const printerType = options.printers.find((p) => p.id === form.printerId)?.type;
+  if (printerType === "fdm" && !materialChosen && sharedColour && form.materialId !== sharedColour) {
+    setForm((f) => ({ ...f, materialId: sharedColour }));
+  }
 
   const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
   const matches =
@@ -129,6 +145,7 @@ export function StartPrintPanel({
       // Ready for the next plate on the same printer.
       setExtras([]);
       setForm({ ...emptyJobForm(), printerId: form.printerId });
+      setMaterialChosen(false);
       setStarted(true);
       onStarted();
     });
@@ -165,6 +182,11 @@ export function StartPrintPanel({
                   <span className="mr-2 font-mono text-sm">{r.code}</span>
                   {r.name}
                   <span className="text-sm text-neutral-500"> · {scaleLabel(r.line.scale, r.defaultScale)}</span>
+                  {r.colour && (
+                    <span className="ml-2 text-sm text-neutral-700">
+                      <ColourChip colour={r.colour.colour} name={r.colour.name} />
+                    </span>
+                  )}
                 </span>
                 <QtyBox
                   label={`How many of ${r.code} on this plate`}
@@ -275,6 +297,11 @@ export function StartPrintPanel({
       {hasItems && (
         <>
           <JobFields form={form} onChange={update} options={options} idPrefix="start" />
+          {printerType === "fdm" && sharedColour && form.materialId === sharedColour && !materialChosen && (
+            <p className="mt-2 text-sm text-neutral-600">
+              Filament chosen to match the colour on this plate. You can change it.
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"

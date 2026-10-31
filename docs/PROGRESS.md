@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (UI fixes and deleting print jobs)_
+_Last updated: 2026-10-31 (Phase 6b: colours, categories, notepad count)_
 
 ## Phases
 
@@ -15,8 +15,8 @@ _Last updated: 2026-10-31 (UI fixes and deleting print jobs)_
 | 4 | Images | Done |
 | 5 | Materials and printers | Done |
 | 6a | Print jobs | Done (needs `0008` run, then testing) |
-| 6b | BASES colours, categories page, notepad count | **Not started (next)** |
-| 7 | Money and stats | Not started |
+| 6b | Colours, categories page, notepad count | Done (needs `0010` run, then testing) |
+| 7 | Money and stats | **Not started (next)** |
 | 8 | Polish | Not started |
 
 ### 1. Foundations: Done
@@ -63,12 +63,13 @@ _Last updated: 2026-10-31 (UI fixes and deleting print jobs)_
 - Catalogue: category sidebar on laptops, category dropdown on phones and tablets; one-line rows from 1280px wide
 - Header: app name links to the catalogue (Catalogue button removed), Notepad, then admin links in a row (Admin drop-down below 1280px), current page highlighted; pages widened to 80rem
 
-### 6b. BASES colours, categories page, notepad count: Not started
-- `colour_material_id` on `request_lines` and `print_job_items`; widen the request line unique rule to (model, scale, colour); add the colour to the line matching in `pj_put_back` (marked "Phase 6b" in `0008_print_jobs.sql`)
-- A view exposing just the colour names (materials with `offer_as_colour`) to the requester
-- Colour choice in the catalogue for categories with `has_colour_options`; colour slot in `app/(app)/admin/models/model-editor.tsx:367`
-- `/admin/categories` page (including `has_colour_options`)
-- Unticked notepad count on the queue
+### 6b. Colours, categories page, notepad count: Done (not yet tested against the real database)
+- `0010_colours.sql`: `colour_material_id` on request lines and job items; one line per model + size + colour; `colour_options` view for the requester; a trigger checking new colour choices; the printing guard also locks the colour; `start_print_job` and `pj_put_back` (used by edit result, revert and delete) carry the colour; BASES marked as having colours
+- The SQL was checked in PGlite: two colours plus "Any colour" of one base, duplicate and not-offered colours refused, colour carried onto the plate, colour locked while printing, lines recreated with an out-of-stock colour, delete restores colours. The whole Phase 6a test also still passes with 0010
+- Catalogue: colour dropdown with swatches (same 44px height), "+ another colour", out-of-stock colours kept and marked; size and colour locked while printing; category sidebar follows the sort order
+- `/admin/categories` (in the header): rename, sort order, colour options, add, delete when empty, model counts
+- Queue and jobs: colour swatch and name next to items; on the Centauri, a plate whose coloured items all share one colour pre-selects that filament
+- Queue: "N unticked notepad notes" linking to /notepad (blank lines aren't counted)
 
 ### 7. Money and stats: Not started
 ### 8. Polish: Not started
@@ -88,6 +89,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0007_seed_materials.sql` | 5 | seeds 9 PLA filaments and 3 resins | ☐ |
 | `0008_print_jobs.sql` | 6a | print jobs, items, printing views, request guard, job RPC functions | ☐ |
 | `0009_delete_print_job.sql` | 6a | `delete_print_job` (reverts a completed job first) | ☐ |
+| `0010_colours.sql` | 6b | colours on request lines and job items, `colour_options` view, colour checks, BASES colours | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -99,8 +101,9 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - History shows the latest 200 jobs only (enough for now; add paging later if needed).
 - Items on a printing job can't be edited; cancel it and start a new plate instead.
 - Cancelled jobs can't be reverted.
-- The UI fixes (sidebar, header, control heights, notepad) passed lint and the build, but haven't been looked at in a browser yet, because I can't log in for you.
-- No `/admin/categories` page and no notepad count on the queue yet (Phase 6b).
+- None of the Phase 6a/6b screens or UI fixes have been checked in a browser yet (Claude can't log in). Lint and the build pass.
+- Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
+- Swatch colours come from the material's colour name (common names mapped by hand). An unusual name may show an empty swatch: rename the colour or add it to `lib/colours.ts`.
 
 **Decisions made along the way**
 - Request lines are shared by both accounts (no per-user owner), hence "Show all current requests".
@@ -114,6 +117,8 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - `my_cost` has its own `my_cost_overridden` flag (not in the original brief), so a hand-typed cost isn't recalculated over.
 - A partly successful job is charged in full; jobs where nothing succeeded, and cancelled jobs, are charged 0 unless set by hand.
 - Job RPCs are `security definer` with an admin check at the top; helper functions are not callable by the app.
+- Colours are set per category (has_colour_options), not per model. The list of colours is every filament with "Offer as colour" ticked and in stock.
+- When a request line is recreated (edit result, revert, delete), it keeps its colour even if that colour is now out of stock: `pj_put_back` sets a transaction-only flag that the colour check respects.
 
 **Bugs fixed (for reference)**
 - Prerender error from `Date.now()` in the Supabase client (26a8a12)

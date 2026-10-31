@@ -4,7 +4,7 @@
 // the row's own columns; the rest open in a panel underneath. Save appears
 // where the Edit button was.
 //
-// Adding an option later (e.g. Phase 6 colour choices for BASES): add the
+// Adding an option later: add the
 // field to ModelInput in app/actions/models.ts, then add a <PanelSection>
 // below.
 
@@ -364,7 +364,7 @@ export function ModelEditor({
             </PanelSection>
           )}
 
-          {/* Phase 6: colour options for categories with colours (BASES) go here. */}
+          {/* Colours are set per category (Categories page), not per model. */}
 
           {model && (
             <PanelSection title="Delete">

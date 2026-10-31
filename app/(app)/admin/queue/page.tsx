@@ -2,7 +2,14 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { loadCategories, loadJobFormOptions, loadModels, loadRequestLines } from "@/lib/data";
+import Link from "next/link";
+import {
+  loadCategories,
+  loadJobFormOptions,
+  loadModels,
+  loadRequestLines,
+  loadUntickedNoteCount,
+} from "@/lib/data";
 import { compareQueue } from "@/lib/requests";
 import { QueueView, type QueueRow } from "./queue-view";
 import type { PickableModel } from "./start-print-panel";
@@ -27,15 +34,21 @@ async function QueueData() {
   const supabase = await createClient();
   let data = null;
   try {
-    const [categories, models, lines, options] = await Promise.all([
+    const [categories, models, lines, options, untickedNotes] = await Promise.all([
       loadCategories(supabase),
       // Retired ("hidden") models are left out, so their lines don't show.
       loadModels(supabase),
       loadRequestLines(supabase),
       loadJobFormOptions(supabase),
+      loadUntickedNoteCount(supabase),
     ]);
     const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
     const modelsById = new Map(models.map((m) => [m.id, m]));
+    const materialsById = new Map(options.materials.map((m) => [m.id, m]));
+    const colourOf = (id: string | null) => {
+      const m = id ? materialsById.get(id) : undefined;
+      return m ? { colour: m.colour, name: m.colour || m.name } : null;
+    };
 
     const rows: QueueRow[] = lines.flatMap((line) => {
       const model = modelsById.get(line.model_id);
@@ -47,6 +60,7 @@ async function QueueData() {
           name: model.name,
           categoryName: categoryNames.get(model.category_id) ?? "",
           defaultScale: model.default_scale,
+          colour: colourOf(line.colour_material_id),
           urgency: line.urgency,
         },
       ];
@@ -62,7 +76,7 @@ async function QueueData() {
       default_scale: m.default_scale,
       other_scales: m.other_scales,
     }));
-    data = { rows, pickable, options };
+    data = { rows, pickable, options, untickedNotes };
   } catch (error) {
     console.error("Loading the queue failed:", error);
   }
@@ -74,5 +88,21 @@ async function QueueData() {
       </p>
     );
   }
-  return <QueueView initialRows={data.rows} models={data.pickable} options={data.options} />;
+  return (
+    <>
+      <p className="mb-4">
+        <Link
+          href="/notepad"
+          className={`inline-block rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-100 ${
+            data.untickedNotes > 0
+              ? "border-amber-300 bg-amber-50 text-amber-900"
+              : "border-neutral-200 text-neutral-600"
+          }`}
+        >
+          {data.untickedNotes} unticked notepad {data.untickedNotes === 1 ? "note" : "notes"} →
+        </Link>
+      </p>
+      <QueueView initialRows={data.rows} models={data.pickable} options={data.options} />
+    </>
+  );
 }

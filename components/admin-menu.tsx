@@ -9,6 +9,7 @@ const ADMIN_LINKS = [
   { href: "/admin/queue", label: "Queue" },
   { href: "/admin/jobs", label: "Jobs" },
   { href: "/admin/models", label: "Models" },
+  { href: "/admin/categories", label: "Categories" },
   { href: "/admin/upload", label: "Upload" },
   { href: "/admin/materials", label: "Materials" },
   { href: "/admin/printers", label: "Printers" },

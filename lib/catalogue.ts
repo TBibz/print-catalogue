@@ -29,14 +29,25 @@ export const naturalCollator = new Intl.Collator("en", {
   sensitivity: "base",
 });
 
-// Catalogue order: category name A→Z, then code in natural order.
+// Category order: sort order (set on the Categories page, lowest first),
+// then name A→Z. Categories left at 0 are simply in name order.
+export function compareCategories(
+  a: { name: string; sort_order: number },
+  b: { name: string; sort_order: number },
+) {
+  return a.sort_order - b.sort_order || naturalCollator.compare(a.name, b.name);
+}
+
+// Catalogue order: category (as above), then code in natural order.
 export function compareModels(
-  a: { code: string; categoryName: string },
-  b: { code: string; categoryName: string },
+  a: { code: string; categoryName: string; categorySort: number },
+  b: { code: string; categoryName: string; categorySort: number },
 ) {
   return (
-    naturalCollator.compare(a.categoryName, b.categoryName) ||
-    naturalCollator.compare(a.code, b.code)
+    compareCategories(
+      { name: a.categoryName, sort_order: a.categorySort },
+      { name: b.categoryName, sort_order: b.categorySort },
+    ) || naturalCollator.compare(a.code, b.code)
   );
 }
 

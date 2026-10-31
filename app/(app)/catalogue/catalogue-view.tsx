@@ -3,8 +3,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AVAILABILITY_LABELS,
+  compareCategories,
   compareModels,
-  naturalCollator,
   showNewBadge,
   type CatalogueModel,
   type Category,
@@ -12,7 +12,9 @@ import {
 import { imageUrl } from "@/lib/images";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
+import type { ColourOption } from "@/lib/colours";
 import {
+  ColourSelect,
   NoteInput,
   QuantityInput,
   SaveStatusText,
@@ -20,11 +22,24 @@ import {
   UrgencySelect,
 } from "@/components/request-fields";
 
-type Row = CatalogueModel & { categoryName: string; printedTotal: number };
+type Row = CatalogueModel & {
+  categoryName: string;
+  categorySort: number;
+  hasColours: boolean; // the category offers colour choices (e.g. BASES)
+  printedTotal: number;
+};
 
 // One set of request controls under a model. A model normally has one slot;
 // "+ another size" adds more. `line` is null until something is saved.
-type Slot = { key: string; line: RequestLine | null; scale: string | null };
+type Slot = {
+  key: string;
+  line: RequestLine | null;
+  scale: string | null;
+  colour: string | null; // colour material id; null = any colour
+};
+
+// One request line per model + size + colour, so that pair identifies a slot.
+const comboKey = (scale: string | null, colour: string | null) => `${scale ?? ""}|${colour ?? ""}`;
 
 const ALL = "all";
 
@@ -63,7 +78,12 @@ function useViewMode() {
 function slotsFromLines(lines: RequestLine[]) {
   const map: Record<string, Slot[]> = {};
   for (const line of lines) {
-    (map[line.model_id] ??= []).push({ key: line.id, line, scale: line.scale });
+    (map[line.model_id] ??= []).push({
+      key: line.id,
+      line,
+      scale: line.scale,
+      colour: line.colour_material_id,
+    });
   }
   return map;
 }
@@ -74,6 +94,7 @@ const blankSlot = (modelId: string): Slot => ({
   key: `blank-${modelId}`,
   line: null,
   scale: null,
+  colour: null,
 });
 
 export function CatalogueView({
@@ -81,12 +102,15 @@ export function CatalogueView({
   models,
   lines,
   printTotals,
+  colours,
 }: {
   categories: Category[];
   models: CatalogueModel[];
   lines: RequestLine[];
   // Successful prints per model, for the NEW badge.
   printTotals: Record<string, number>;
+  // Colours the colour dropdown can show (e.g. for BASES).
+  colours: ColourOption[];
 }) {
   const [activeTab, setActiveTab] = useState<string>(ALL);
   const [query, setQuery] = useState("");
@@ -113,11 +137,13 @@ export function CatalogueView({
 
   // Attach the category name to each model, and sort once.
   const rows = useMemo(() => {
-    const names = new Map(categories.map((c) => [c.id, c.name]));
+    const byId = new Map(categories.map((c) => [c.id, c]));
     return models
       .map((m) => ({
         ...m,
-        categoryName: names.get(m.category_id) ?? "",
+        categoryName: byId.get(m.category_id)?.name ?? "",
+        categorySort: byId.get(m.category_id)?.sort_order ?? 0,
+        hasColours: byId.get(m.category_id)?.has_colour_options ?? false,
         printedTotal: printTotals[m.id] ?? 0,
       }))
       .sort(compareModels);
@@ -134,7 +160,7 @@ export function CatalogueView({
   const tabs = useMemo(() => {
     return categories
       .filter((c) => counts.has(c.id))
-      .sort((a, b) => naturalCollator.compare(a.name, b.name));
+      .sort(compareCategories);
   }, [categories, counts]);
 
   // ---- Slot changes (all use the "prev =>" form so they stay stable) ----
@@ -143,8 +169,10 @@ export function CatalogueView({
       const list = prev[modelId] ?? [];
       const exists = list.some((s) => s.key === key);
       const next = exists
-        ? list.map((s) => (s.key === key ? { ...s, line, scale: line.scale } : s))
-        : [...list, { key, line, scale: line.scale }];
+        ? list.map((s) =>
+            s.key === key ? { ...s, line, scale: line.scale, colour: line.colour_material_id } : s,
+          )
+        : [...list, { key, line, scale: line.scale, colour: line.colour_material_id }];
       return { ...prev, [modelId]: next };
     });
   }, []);
@@ -162,14 +190,18 @@ export function CatalogueView({
     });
   }, []);
 
-  const handleAddSize = useCallback((modelId: string, scale: string | null) => {
-    setSlotsByModel((prev) => {
-      // If only the implicit blank slot was showing, keep it as the first.
-      const list = prev[modelId]?.length ? prev[modelId] : [blankSlot(modelId)];
-      const key = `extra-${modelId}-${Date.now()}`;
-      return { ...prev, [modelId]: [...list, { key, line: null, scale }] };
-    });
-  }, []);
+  // "+ another size" / "+ another colour": a new blank slot.
+  const handleAddSlot = useCallback(
+    (modelId: string, scale: string | null, colour: string | null) => {
+      setSlotsByModel((prev) => {
+        // If only the implicit blank slot was showing, keep it as the first.
+        const list = prev[modelId]?.length ? prev[modelId] : [blankSlot(modelId)];
+        const key = `extra-${modelId}-${Date.now()}`;
+        return { ...prev, [modelId]: [...list, { key, line: null, scale, colour }] };
+      });
+    },
+    [],
+  );
 
   // ---- Filtering -------------------------------------------------------
   const savedLines = (modelId: string) =>
@@ -195,6 +227,8 @@ export function CatalogueView({
   });
 
   const shownTab = searching ? ALL : activeTab;
+  // The column headings include "Colour" when every row shown has colours.
+  const colourHeader = visible.length > 0 && visible.every((r) => r.hasColours);
 
   // Choosing a category clears the search (search covers every category).
   const chooseCategory = (id: string) => {
@@ -317,7 +351,8 @@ export function CatalogueView({
               version={synced.version}
               onSaved={handleSaved}
               onRemoved={handleRemoved}
-              onAddSize={handleAddSize}
+              onAddSlot={handleAddSlot}
+                colours={colours}
               onOpenImage={openImage}
             />
           ))}
@@ -328,8 +363,9 @@ export function CatalogueView({
           <div className="hidden grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,40rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid">
             <span>Code</span>
             <span>Name</span>
-            <span className="grid grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem] gap-2">
+            <span className={`grid gap-2 ${colourHeader ? COLOUR_ROW : PLAIN_ROW}`}>
               <span>Size</span>
+              {colourHeader && <span>Colour</span>}
               <span className="text-center">Qty</span>
               <span>Urgency</span>
               <span>Note</span>
@@ -345,7 +381,8 @@ export function CatalogueView({
                 version={synced.version}
                 onSaved={handleSaved}
                 onRemoved={handleRemoved}
-                onAddSize={handleAddSize}
+                onAddSlot={handleAddSlot}
+                colours={colours}
                 onOpenImage={openImage}
               />
             ))}
@@ -389,13 +426,14 @@ function CategoryButton({
 type SlotCallbacks = {
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
-  onAddSize: (modelId: string, scale: string | null) => void;
+  onAddSlot: (modelId: string, scale: string | null, colour: string | null) => void;
 };
 
 type ModelItemProps = SlotCallbacks & {
   model: Row;
   slots: Slot[] | undefined;
   version: number;
+  colours: ColourOption[]; // for categories with colour options
 };
 
 type ImageProps = { onOpenImage: (model: Row) => void };
@@ -571,47 +609,87 @@ function ImageIcon() {
   );
 }
 
-// All the request lines for one model, plus "+ another size".
+// The one-line (xl) layout of a request row: size, [colour,] qty, urgency,
+// note, status.
+const PLAIN_ROW = "grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
+const COLOUR_ROW = "grid-cols-[6rem_9rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
+// The same with the xl: prefix, written out in full so Tailwind finds them.
+const XL_PLAIN_ROW = "xl:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
+const XL_COLOUR_ROW = "xl:grid-cols-[6rem_9rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]";
+
+// All the request lines for one model, plus "+ another size" and (for
+// categories with colours) "+ another colour".
 function RequestSlots({
   model,
   slots: storedSlots,
   version,
+  colours,
   compact,
   onSaved,
   onRemoved,
-  onAddSize,
+  onAddSlot,
 }: ModelItemProps & { compact: boolean }) {
   const slots = storedSlots?.length ? storedSlots : [blankSlot(model.id)];
   const options = scaleOptions(model);
   const hasSizes = options.length > 1;
-  const usedScales = slots.map((s) => s.line?.scale ?? s.scale);
-  const unusedScale = options.find((o) => !usedScales.includes(o));
+  const combos = slots.map((s) => ({
+    scale: s.line?.scale ?? s.scale,
+    colour: s.line?.colour_material_id ?? s.colour,
+  }));
+  const used = new Set(combos.map((c) => comboKey(c.scale, c.colour)));
+  // A size not yet requested (in "Any colour").
+  const unusedScale = options.find((o) => !used.has(comboKey(o, null)));
+  // A colour not yet requested in the first line's size.
+  const firstScale = combos[0].scale;
+  const unusedColour = model.hasColours
+    ? [null, ...colours.filter((c) => c.available).map((c) => c.id)].find(
+        (c) => !used.has(comboKey(firstScale, c)),
+      )
+    : undefined;
 
   return (
     <div className="space-y-2">
-      {slots.map((slot, i) => (
-        <LineEditor
-          key={`${slot.key}@${version}`}
-          model={model}
-          slot={slot}
-          hasSizes={hasSizes}
-          options={options}
-          takenScales={usedScales.filter((_, j) => j !== i)}
-          onSaved={onSaved}
-          onRemoved={onRemoved}
-          canRemove={i > 0 && !slot.line}
-          compact={compact}
-        />
-      ))}
-      {hasSizes && unusedScale !== undefined && (
-        <button
-          type="button"
-          onClick={() => onAddSize(model.id, unusedScale)}
-          className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
-        >
-          + another size
-        </button>
-      )}
+      {slots.map((slot, i) => {
+        const others = combos.filter((_, j) => j !== i);
+        const mine = combos[i];
+        return (
+          <LineEditor
+            key={`${slot.key}@${version}`}
+            model={model}
+            slot={slot}
+            hasSizes={hasSizes}
+            options={options}
+            // Sizes / colours another line already has with this line's colour / size.
+            takenScales={others.filter((c) => c.colour === mine.colour).map((c) => c.scale)}
+            takenColours={others.filter((c) => c.scale === mine.scale).map((c) => c.colour)}
+            colours={colours}
+            onSaved={onSaved}
+            onRemoved={onRemoved}
+            canRemove={i > 0 && !slot.line}
+            compact={compact}
+          />
+        );
+      })}
+      <div className="flex flex-wrap gap-x-4">
+        {hasSizes && unusedScale !== undefined && (
+          <button
+            type="button"
+            onClick={() => onAddSlot(model.id, unusedScale, null)}
+            className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
+          >
+            + another size
+          </button>
+        )}
+        {unusedColour !== undefined && (
+          <button
+            type="button"
+            onClick={() => onAddSlot(model.id, firstScale, unusedColour)}
+            className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
+          >
+            + another colour
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -622,6 +700,8 @@ function LineEditor({
   hasSizes,
   options,
   takenScales,
+  takenColours,
+  colours,
   onSaved,
   onRemoved,
   canRemove,
@@ -632,6 +712,8 @@ function LineEditor({
   hasSizes: boolean;
   options: (string | null)[];
   takenScales: (string | null)[];
+  takenColours: (string | null)[];
+  colours: ColourOption[];
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
   canRemove: boolean; // an extra, unsaved size line can be removed
@@ -641,6 +723,7 @@ function LineEditor({
     modelId: model.id,
     line: slot.line,
     initialScale: slot.scale,
+    initialColour: slot.colour,
     onSaved: (line) => onSaved(model.id, slot.key, line),
     onDeleted: () => onRemoved(model.id, slot.key),
   });
@@ -650,11 +733,14 @@ function LineEditor({
   const sizeOptions = options.includes(fields.scale) ? options : [...options, fields.scale];
   // On wide screens (xl) the list view puts everything on one line.
   const wide = compact ? "" : "xl:col-span-1";
+  // Size and colour can't change while some are printing (the database
+  // refuses too).
+  const locked = (slot.line?.printing ?? 0) > 0;
 
   return (
     <div
       className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 ${
-        compact ? "" : "xl:grid-cols-[6rem_4.5rem_8rem_minmax(0,1fr)_5.5rem]"
+        compact ? "" : model.hasColours ? XL_COLOUR_ROW : XL_PLAIN_ROW
       }`}
     >
       <div className={`col-span-3 text-sm text-neutral-600 ${wide}`}>
@@ -665,6 +751,7 @@ function LineEditor({
             options={sizeOptions}
             defaultScale={model.default_scale}
             disabledOptions={takenScales}
+            locked={locked}
             onChange={(v) => update("scale", v, "now")}
           />
         ) : (
@@ -674,6 +761,18 @@ function LineEditor({
           </span>
         )}
       </div>
+      {model.hasColours && (
+        <div className={`col-span-3 ${wide}`}>
+          <ColourSelect
+            label={`Colour for ${what}`}
+            value={fields.colourId}
+            options={colours}
+            disabledOptions={takenColours}
+            locked={locked}
+            onChange={(v) => update("colourId", v, "now")}
+          />
+        </div>
+      )}
       <QuantityInput
         label={`Quantity for ${what}`}
         value={fields.quantity}

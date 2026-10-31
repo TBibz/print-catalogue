@@ -14,6 +14,7 @@ export type RequestLineRow = {
   id: string;
   model_id: string;
   scale: string | null; // null = the model's default scale
+  colour_material_id: string | null; // null = any colour
   quantity: number;
   urgency: Urgency | null;
   note: string;
@@ -29,7 +30,7 @@ export type RequestLine = RequestLineRow & {
 };
 
 export const REQUEST_LINE_COLUMNS =
-  "id, model_id, scale, quantity, urgency, note, created_at, updated_at";
+  "id, model_id, scale, colour_material_id, quantity, urgency, note, created_at, updated_at";
 
 // Pill colours, matching the old sheet (brief section 5).
 export const URGENCY_STYLES: Record<Urgency | "none", string> = {

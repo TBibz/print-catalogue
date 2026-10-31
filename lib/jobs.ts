@@ -11,6 +11,7 @@ export type JobItem = {
   request_line_id: string | null;
   from_request: boolean;
   scale: string | null;
+  colour_material_id: string | null; // null = any colour
   quantity_planned: number;
   quantity_succeeded: number | null;
   quantity_applied_to_request: number;
@@ -46,7 +47,7 @@ export const JOB_COLUMNS = `
   est_material_ml, est_weight_g, print_hours, print_minutes, est_cost,
   layer_height_mm, material_id, my_cost, my_cost_overridden, charge, charge_overridden,
   print_job_items (
-    id, model_id, free_text_name, request_line_id, from_request, scale,
+    id, model_id, free_text_name, request_line_id, from_request, scale, colour_material_id,
     quantity_planned, quantity_succeeded, quantity_applied_to_request,
     models ( code, name, default_scale )
   )`;

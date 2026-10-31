@@ -66,9 +66,13 @@ export function ModelsList({
   );
 
   const rows = useMemo(() => {
-    const names = new Map(categories.map((c) => [c.id, c.name]));
+    const byId = new Map(categories.map((c) => [c.id, c]));
     return models
-      .map((m) => ({ ...m, categoryName: names.get(m.category_id) ?? "" }))
+      .map((m) => ({
+        ...m,
+        categoryName: byId.get(m.category_id)?.name ?? "",
+        categorySort: byId.get(m.category_id)?.sort_order ?? 0,
+      }))
       .sort(compareModels);
   }, [categories, models]);
 

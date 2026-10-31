@@ -11,6 +11,7 @@ import {
   type RequestLine,
   type RequestLineRow,
 } from "@/lib/requests";
+import type { ColourOption } from "@/lib/colours";
 import { DEFAULT_RESIN_DIVISOR, JOB_COLUMNS, type Job, type JobFormOptions } from "@/lib/jobs";
 import { MATERIAL_COLUMNS, PRINTER_COLUMNS, type Material, type Printer } from "@/lib/materials";
 
@@ -145,4 +146,37 @@ export async function loadJobs(supabase: SupabaseClient, which: "printing" | "hi
   const { data, error } = await query.returns<Job[]>();
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+// How many models (including retired ones) each category has: { id: count }.
+// Admin only (reads the models table).
+export async function loadModelCountsByCategory(supabase: SupabaseClient) {
+  const rows = await fetchAll<{ category_id: string }>((from, to) =>
+    supabase.from("models").select("category_id").range(from, to).returns<{ category_id: string }[]>(),
+  );
+  const counts: Record<string, number> = {};
+  for (const r of rows) counts[r.category_id] = (counts[r.category_id] ?? 0) + 1;
+  return counts;
+}
+
+// Colours the catalogue's colour dropdown can show (names and stock only).
+export async function loadColourOptions(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("colour_options")
+    .select("id, name, colour, available, in_stock")
+    .order("name")
+    .returns<ColourOption[]>();
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+// How many notepad lines are not ticked off yet (blank lines don't count).
+export async function loadUntickedNoteCount(supabase: SupabaseClient) {
+  const { count, error } = await supabase
+    .from("notepad_lines")
+    .select("id", { count: "exact", head: true })
+    .eq("done", false)
+    .neq("text", "");
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }

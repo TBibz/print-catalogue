@@ -16,6 +16,7 @@ export type SaveLineInput = {
   id: string | null; // null = a new line
   modelId: string;
   scale: string | null;
+  colourMaterialId: string | null; // null = any colour
   quantity: number;
   urgency: Urgency | null;
   note: string;
@@ -49,6 +50,9 @@ export async function saveRequestLine(input: SaveLineInput): Promise<SaveResult>
   const values = {
     model_id: input.modelId,
     scale,
+    // The database checks the colour is offered and in stock, and that the
+    // model's category has colour options (0010_colours.sql).
+    colour_material_id: input.colourMaterialId || null,
     quantity,
     urgency: input.urgency,
     note,
@@ -98,7 +102,7 @@ function friendlyError(error: { code?: string; message: string }) {
   // being printed, so the quantity can't go below 2."
   if (error.code === "P0001") return error.message;
   if (error.code === "23505") {
-    return "There's already a request for this model in that size.";
+    return "There's already a request for this model in that size and colour.";
   }
   if (error.code === "42501") {
     return "You don't have permission to do that. Try logging in again.";

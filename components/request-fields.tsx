@@ -1,6 +1,7 @@
 "use client";
 
 // The controls for one request line, used by the catalogue and the queue.
+import { ANY_COLOUR, colourName, swatchBackground, type ColourOption } from "@/lib/colours";
 import { URGENCIES, URGENCY_STYLES, scaleLabel, type Urgency } from "@/lib/requests";
 import type { SaveStatus } from "@/lib/use-line-autosave";
 
@@ -114,6 +115,7 @@ export function ScaleSelect({
   disabledOptions,
   label,
   onChange,
+  locked = false,
 }: {
   value: string | null;
   options: (string | null)[];
@@ -121,13 +123,16 @@ export function ScaleSelect({
   disabledOptions: (string | null)[]; // sizes another line already uses
   label: string;
   onChange: (value: string | null) => void;
+  locked?: boolean; // true while some are printing: the size can't change
 }) {
   return (
     <select
       aria-label={label}
       value={value ?? ""}
+      disabled={locked}
+      title={locked ? "Some are being printed, so the size can't be changed" : undefined}
       onChange={(e) => onChange(e.target.value || null)}
-      className={`${box} w-full cursor-pointer text-sm`}
+      className={`${box} w-full cursor-pointer text-sm disabled:cursor-not-allowed disabled:bg-neutral-100`}
     >
       {options.map((s) => (
         <option key={s ?? ""} value={s ?? ""} disabled={disabledOptions.includes(s)}>
@@ -135,6 +140,59 @@ export function ScaleSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+// "Any colour" plus the colours on offer (in stock). A colour a line already
+// uses stays listed even if it's gone out of stock, marked as such.
+export function ColourSelect({
+  value,
+  options,
+  disabledOptions,
+  label,
+  onChange,
+  locked = false,
+}: {
+  value: string | null; // null = any colour
+  options: ColourOption[];
+  disabledOptions: (string | null)[]; // colours another line already uses
+  label: string;
+  onChange: (value: string | null) => void;
+  locked?: boolean; // true while some are printing: the colour can't change
+}) {
+  const current = options.find((o) => o.id === value);
+  const shown = options.filter((o) => o.available || o.id === value);
+  return (
+    <div className="relative">
+      {/* The swatch for the chosen colour, inside the box on the left. */}
+      {current && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-neutral-400"
+          style={{ background: swatchBackground(current.colour) }}
+        />
+      )}
+      <select
+        aria-label={label}
+        value={value ?? ""}
+        disabled={locked}
+        title={locked ? "Some are being printed, so the colour can't be changed" : undefined}
+        onChange={(e) => onChange(e.target.value || null)}
+        className={`${box} w-full cursor-pointer text-sm disabled:cursor-not-allowed disabled:bg-neutral-100 ${
+          current ? "pl-8" : ""
+        }`}
+      >
+        <option value="" disabled={disabledOptions.includes(null)}>
+          {ANY_COLOUR}
+        </option>
+        {shown.map((o) => (
+          <option key={o.id} value={o.id} disabled={disabledOptions.includes(o.id)}>
+            {colourName(o)}
+            {o.available ? "" : o.in_stock ? " (no longer offered)" : " (out of stock)"}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

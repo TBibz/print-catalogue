@@ -1,6 +1,6 @@
 "use client";
 
-// Autosave for one request line (quantity, urgency, note, scale).
+// Autosave for one request line (quantity, urgency, note, scale, colour).
 //
 // - Typing saves after a short pause; leaving a box (blur) saves at once.
 // - Dropdowns save at once.
@@ -18,6 +18,7 @@ const SAVED_MESSAGE_MS = 2500;
 
 export type LineFields = {
   scale: string | null; // null = default scale
+  colourId: string | null; // null = any colour
   quantity: string; // kept as typed, so the box can be blank
   urgency: Urgency | null;
   note: string;
@@ -35,19 +36,25 @@ type Options = {
   modelId: string;
   line: RequestLine | null;
   initialScale?: string | null;
+  initialColour?: string | null;
   onSaved: (line: RequestLine) => void;
   onDeleted: () => void;
 };
 
-function fieldsFrom(line: RequestLine | null, scale: string | null): LineFields {
+function fieldsFrom(
+  line: RequestLine | null,
+  scale: string | null,
+  colourId: string | null = null,
+): LineFields {
   return line
     ? {
         scale: line.scale,
+        colourId: line.colour_material_id,
         quantity: String(line.quantity),
         urgency: line.urgency,
         note: line.note,
       }
-    : { scale, quantity: "", urgency: null, note: "" };
+    : { scale, colourId, quantity: "", urgency: null, note: "" };
 }
 
 // The same rule is enforced by the database, for everyone.
@@ -56,6 +63,7 @@ const printingMessage = (printing: number) =>
 
 const sameFields = (a: LineFields, b: LineFields) =>
   a.scale === b.scale &&
+  a.colourId === b.colourId &&
   a.quantity.trim() === b.quantity.trim() &&
   a.urgency === b.urgency &&
   a.note.trim() === b.note.trim();
@@ -64,10 +72,11 @@ export function useLineAutosave({
   modelId,
   line,
   initialScale = null,
+  initialColour = null,
   onSaved,
   onDeleted,
 }: Options) {
-  const [fields, setFields] = useState<LineFields>(() => fieldsFrom(line, initialScale));
+  const [fields, setFields] = useState<LineFields>(() => fieldsFrom(line, initialScale, initialColour));
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
 
   // Refs hold the latest values for the async save code.
@@ -127,8 +136,8 @@ export function useLineAutosave({
         }
         lineRef.current = null;
         savedRef.current = null;
-        // Back to a completely blank row (the size choice stays).
-        const blank = fieldsFrom(null, current.scale);
+        // Back to a completely blank row (the size and colour choices stay).
+        const blank = fieldsFrom(null, current.scale, current.colourId);
         fieldsRef.current = blank;
         setFields(blank);
         showSaved();
@@ -160,6 +169,7 @@ export function useLineAutosave({
         id: existing?.id ?? null,
         modelId,
         scale: current.scale,
+        colourMaterialId: current.colourId,
         quantity,
         urgency: current.urgency,
         note: current.note,

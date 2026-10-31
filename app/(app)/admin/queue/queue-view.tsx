@@ -10,6 +10,7 @@ import {
   UrgencySelect,
 } from "@/components/request-fields";
 import type { JobFormOptions } from "@/lib/jobs";
+import { ColourChip } from "@/components/colour-chip";
 import { StartPrintPanel, type PickableModel } from "./start-print-panel";
 
 export type QueueRow = {
@@ -18,6 +19,8 @@ export type QueueRow = {
   name: string;
   categoryName: string;
   defaultScale: string | null;
+  // The line's colour (null = any colour, or a category without colours).
+  colour: { colour: string; name: string } | null;
   urgency: Urgency | null; // copy of line.urgency, used for sorting
 };
 
@@ -220,7 +223,14 @@ function QueueLine({
           className="mr-3 h-5 w-5 cursor-pointer align-middle accent-neutral-900 disabled:cursor-not-allowed disabled:opacity-30"
         />
         <span className="mr-2 font-mono text-sm">{row.code}</span>
-        <span className="min-w-0 break-words">{row.name}</span>
+        <span className="min-w-0 break-words">
+          {row.name}
+          {row.colour && (
+            <span className="ml-2 text-sm text-neutral-700">
+              <ColourChip colour={row.colour.colour} name={row.colour.name} />
+            </span>
+          )}
+        </span>
         <span className="block text-xs text-neutral-500 lg:text-sm lg:text-neutral-600">
           {row.categoryName}
           <span className="lg:hidden"> · {scaleLabel(fields.scale, row.defaultScale)}</span>
