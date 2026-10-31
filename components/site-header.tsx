@@ -48,6 +48,9 @@ async function AdminLinks() {
       <Link href="/admin/queue" className={navLink}>
         Queue
       </Link>
+      <Link href="/admin/jobs" className={navLink}>
+        Jobs
+      </Link>
       <AdminMenu className={navLink} />
     </>
   );

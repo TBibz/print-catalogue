@@ -54,8 +54,9 @@ export async function saveRequestLine(input: SaveLineInput): Promise<SaveResult>
     note,
   };
 
-  // Phase 6: check `quantity` is not below what is currently printing for
-  // this line (for the requester), using addPrinting() on the existing row.
+  // The database refuses a quantity below what is printing (see the
+  // request_lines_printing_guard trigger in 0008_print_jobs.sql), and its
+  // message is passed on by friendlyError().
 
   let row: RequestLineRow | null = null;
 
@@ -93,6 +94,9 @@ export async function deleteRequestLine(id: string): Promise<DeleteResult> {
 
 function friendlyError(error: { code?: string; message: string }) {
   console.error("request_lines:", error.message);
+  // A message raised on purpose by the database, e.g. "2 of these are
+  // being printed, so the quantity can't go below 2."
+  if (error.code === "P0001") return error.message;
   if (error.code === "23505") {
     return "There's already a request for this model in that size.";
   }

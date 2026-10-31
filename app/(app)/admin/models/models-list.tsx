@@ -5,6 +5,8 @@ import {
   AVAILABILITY_LABELS,
   compareModels,
   naturalCollator,
+  NEW_BADGE_PRINT_LIMIT,
+  showNewBadge,
   type AdminModel,
   type Availability,
   type Category,
@@ -33,10 +35,13 @@ export function ModelsList({
   categories,
   models: serverModels,
   requestCounts,
+  printTotals,
 }: {
   categories: Category[];
   models: AdminModel[];
   requestCounts: Record<string, number>;
+  // Successful prints per model (completed jobs).
+  printTotals: Record<string, number>;
 }) {
   const [models, setModels] = useState(serverModels);
   const [query, setQuery] = useState("");
@@ -228,11 +233,23 @@ export function ModelsList({
                 <span className="font-mono text-sm">{m.code}</span>
                 <span className="col-start-1 min-w-0 md:col-start-auto">
                   <span className="break-words">{m.name}</span>
-                  {m.show_new_badge && (
+                  {showNewBadge(m, printTotals[m.id] ?? 0) ? (
                     <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-800">
                       NEW
                     </span>
+                  ) : (
+                    m.show_new_badge && (
+                      <span
+                        className="ml-2 align-middle text-xs text-neutral-500"
+                        title={`The NEW badge turns off once ${NEW_BADGE_PRINT_LIMIT} have been printed`}
+                      >
+                        NEW ended
+                      </span>
+                    )
                   )}
+                  <span className="ml-2 align-middle text-xs text-neutral-500">
+                    Printed {printTotals[m.id] ?? 0}
+                  </span>
                   {m.admin_notes && (
                     <span className="block truncate text-xs text-neutral-500" title={m.admin_notes}>
                       {m.admin_notes}

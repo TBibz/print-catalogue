@@ -41,7 +41,7 @@ export function compareModels(
 }
 
 // The NEW badge shows while the flag is on AND fewer than 4 have been printed
-// successfully. Print jobs arrive in Phase 6; until then the total is 0.
+// successfully (model_print_totals in 0008_print_jobs.sql).
 export const NEW_BADGE_PRINT_LIMIT = 4;
 
 export function showNewBadge(

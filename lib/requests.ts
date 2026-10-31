@@ -24,8 +24,7 @@ export type RequestLineRow = {
 // What the pages work with: the row plus how many are currently printing.
 export type RequestLine = RequestLineRow & {
   // Sum of quantity_planned on this line's items in printing jobs.
-  // Always 0 until print jobs exist (Phase 6). The requester can't set the
-  // quantity below this.
+  // Nobody can set the quantity below this.
   printing: number;
 };
 

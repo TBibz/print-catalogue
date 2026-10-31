@@ -66,7 +66,7 @@ One row per model + option combination that Dad currently wants.
 - Unique on (model_id, scale, colour_material_id), treating nulls as equal. (Currently unique on (model_id, scale); Phase 6 adds `colour_material_id` and widens the rule.)
 - Deleting a model deletes its request lines (cascade).
 - Setting the quantity to 0/blank deletes the row (the item goes back to blank).
-- Dad cannot set the quantity below the amount currently printing for that line.
+- Nobody can set the quantity below the amount currently printing for that line, delete a line that is printing, or change its size. A database trigger enforces this (`request_lines_printing_guard`), and the UI shows the same message.
 
 ### printers (Phase 5)
 - `id`, `name` ("Saturn 4 Ultra", "Centauri Carbon"), `type` (`resin` | `fdm`), `active`
@@ -84,16 +84,18 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 
 ### print_jobs (Phase 6) — one job = one plate
 - `id`, `printer_id`, `title` (optional), `status`: `printing` | `completed` | `cancelled`
-- `started_at`, `completed_at`
+- `started_at`, `completed_at`, `cancelled_at`, `created_by`
 - Shared: `notes`. Success or failure is recorded per item (`quantity_succeeded`).
 - **The job form changes with the printer type. Choose the printer first, then show only the fields for that type:**
   - **Resin (Saturn 4 Ultra)**, required: `est_material_ml`, `est_weight_g`, `print_hours` + `print_minutes`, `est_cost` (£, typed in from the slicer). Optional: `layer_height_mm` (default 0.05), `material_id` (resin bottle).
   - **FDM (Centauri Carbon)**, required: `est_weight_g`, `material_id` (dropdown of FDM materials). `my_cost` and `charge` are calculated from the material. Optional: `print_hours` + `print_minutes`.
 - Store all of these as nullable columns on print_jobs. Validate the required set per printer type in the form and in the RPC.
-- Money (all editable): `my_cost`, `charge`, `charge_overridden` (bool)
+- Money (all editable): `my_cost` + `my_cost_overridden`, `charge` + `charge_overridden` (bool). When not overridden, the database recalculates them whenever the job changes.
+- Admin only (RLS). The requester sees printing amounts only through the `request_line_printing` view (request_line_id + printing, nothing else) and printed totals through `model_print_totals` (model_id + printed_total).
 
 ### print_job_items (Phase 6)
-- `id`, `job_id`, `model_id` (nullable), `free_text_name` (for things not in the catalogue), `request_line_id` (nullable), `scale`, `colour_material_id`
+- `id`, `job_id`, `model_id` (nullable, no cascade: print history blocks deleting a model), `free_text_name` (for things not in the catalogue), `request_line_id` (nullable; set to null if the line is deleted), `scale`, `colour_material_id` (Phase 6b, not yet added)
+- `from_request` (bool: the item came from a request line, even after that line is gone), `request_urgency` + `request_note` (copies taken from the line, so a deleted line can be recreated the same way)
 - `quantity_planned`, `quantity_succeeded` (null until completed), `quantity_applied_to_request` (how much was actually taken off the request line, so edits and reverts are exact)
 
 ### notepad_lines (Phase 3)
@@ -127,9 +129,13 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 - Failed or unsuccessful units simply stop being "printing", so the request still shows them as wanted.
 - Mark the job completed.
 
-**Editing a completed result / reverting** (one RPC)
-- Adjusting `quantity_succeeded` re-applies only the difference, recreating the request line if needed.
-- Reverting a completed job puts back `quantity_applied_to_request` and sets the job back to `printing` (or `cancelled`).
+**Starting a job** (one RPC): items are request lines (quantity at most line quantity − already printing), catalogue models nobody requested, or free-text items.
+
+**Editing a completed result / reverting** (one RPC each)
+- Adjusting `quantity_succeeded` re-applies only the difference: fewer succeeded puts the extra back (recreating the request line if needed, with the same model, size, urgency and note, or adding to an existing line for that model and size); more succeeded takes more off the line if it still wants some (never below what other jobs are printing).
+- Reverting a completed job puts back `quantity_applied_to_request` and sets the job back to `printing`. Cancelled jobs can't be reverted (start a new plate instead).
+
+**RPC functions** (`0008_print_jobs.sql`, admin only, one transaction each): `start_print_job`, `complete_print_job`, `update_completed_result`, `revert_print_job`, `cancel_print_job`, `update_print_job_details`. They raise plain-English messages that the app shows as they are.
 
 **Cancelling a printing job:** nothing is counted.
 
@@ -140,7 +146,7 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 **Charges (Phase 6)**
 - Resin job: `charge` = est_weight_g ÷ resin_charge_divisor (15). `my_cost` = the `est_cost` typed in from the slicer.
 - FDM job: `charge` = est_weight_g × material charge_per_unit. `my_cost` = est_weight_g × material cost_per_unit.
-- Charges are always editable (`charge_overridden`). Cancelled jobs, and jobs where nothing succeeded, are not charged by default.
+- Charges are always editable (`charge_overridden`). Cancelled jobs, and jobs where nothing succeeded, are not charged by default. A partly successful job is charged in full.
 
 ## 6. Pages
 
@@ -150,8 +156,9 @@ Everyone:
 - `/notepad`: handwritten-style font, bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
 
 Admin only:
-- `/admin/queue`: all request lines sorted by the queue rule. Tick lines, set how many go on this plate, choose printer, "Start print". Shows the unticked notepad count.
-- `/admin/jobs`: printing jobs (complete / partial / cancel), history of completed jobs (edit result / revert).
+- `/admin/queue`: all request lines sorted by the queue rule, with "N requested · M printing". Tick lines, set how many go on this plate (default = what's left to print), add catalogue models (search) or free-text items, choose printer, see my cost and charge live, "Start print". Shows the unticked notepad count (Phase 6b).
+- `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item and All succeeded / All failed shortcuts, Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert.
+- `/admin/models` also shows each model's printed total.
 - `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it.
 - `/admin/upload`: bulk image upload; match file name to `code_key`, create new models for unknown codes (choose a category for the batch), ask before replacing an existing image.
 - `/admin/categories`, `/admin/materials`, `/admin/printers`
@@ -165,7 +172,9 @@ Admin only:
 3. **Notepad + model admin:** notepad page; admin add/edit/retire models, scales, NEW badge.
 4. **Images:** storage bucket, bulk upload, grid view, hover preview.
 5. **Materials and printers:** materials index, printers, settings. These come first because the job form needs them.
-6. **Print jobs:** start print from the queue with the printer-specific form, complete/partial/cancel/edit/revert, costs and charges, printing status on the catalogue, printed totals, NEW badge auto-off, colour choice for BASES.
+6. **Print jobs**, in two parts:
+   - **6a:** start print from the queue with the printer-specific form, complete/partial/cancel/edit/revert, costs and charges, printing status on the catalogue, printed totals, NEW badge auto-off.
+   - **6b:** colour choice for BASES (`colour_material_id` on request lines and job items), `/admin/categories` page, unticked notepad count on the queue.
 7. **Money and stats:** purchases, payments, monthly cost vs revenue, print stats.
 8. **Polish:** installable home-screen app, custom domain, small UX fixes.
 

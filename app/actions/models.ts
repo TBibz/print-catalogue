@@ -115,8 +115,12 @@ export async function deleteModel(id: string): Promise<DeleteModelResult> {
 
   if (error) {
     console.error("models delete:", error.message);
+    if (error.code === "P0001") {
+      // Its open requests are being printed (see 0008_print_jobs.sql).
+      return { ok: false, error: "Some of this model is being printed, so it can't be deleted. Retire it instead." };
+    }
     if (error.code === "23503") {
-      // Something still points at it: print history (from Phase 6), or
+      // Something still points at it: print history, or
       // open requests if 0004_model_delete.sql hasn't been run yet.
       return {
         ok: false,

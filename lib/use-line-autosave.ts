@@ -50,6 +50,10 @@ function fieldsFrom(line: RequestLine | null, scale: string | null): LineFields 
     : { scale, quantity: "", urgency: null, note: "" };
 }
 
+// The same rule is enforced by the database, for everyone.
+const printingMessage = (printing: number) =>
+  `${printing} ${printing === 1 ? "is" : "are"} being printed, so the quantity can't go below ${printing}.`;
+
 const sameFields = (a: LineFields, b: LineFields) =>
   a.scale === b.scale &&
   a.quantity.trim() === b.quantity.trim() &&
@@ -102,6 +106,10 @@ export function useLineAutosave({
           setStatus({ kind: "idle" });
           return;
         }
+        if (existing && existing.printing > 0) {
+          setStatus({ kind: "error", message: printingMessage(existing.printing) });
+          return;
+        }
         if (!existing) {
           const hasOther = current.urgency !== null || current.note.trim() !== "";
           setStatus(
@@ -136,7 +144,7 @@ export function useLineAutosave({
       }
       const printing = existing?.printing ?? 0;
       if (quantity < printing) {
-        setStatus({ kind: "error", message: `${printing} already printing` });
+        setStatus({ kind: "error", message: printingMessage(printing) });
         return;
       }
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { loadCategories, loadModels, loadRequestLines } from "@/lib/data";
+import { loadCategories, loadModels, loadPrintTotals, loadRequestLines } from "@/lib/data";
 import { CatalogueView } from "./catalogue-view";
 
 export const metadata: Metadata = { title: "Catalogue · Print Catalogue" };
@@ -25,12 +25,13 @@ async function CatalogueData() {
 
   let data;
   try {
-    const [categories, models, lines] = await Promise.all([
+    const [categories, models, lines, printTotals] = await Promise.all([
       loadCategories(supabase),
       loadModels(supabase),
       loadRequestLines(supabase),
+      loadPrintTotals(supabase),
     ]);
-    data = { categories, models, lines };
+    data = { categories, models, lines, printTotals };
   } catch (error) {
     console.error("Loading the catalogue failed:", error);
     data = null;

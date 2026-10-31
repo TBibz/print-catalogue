@@ -11,6 +11,8 @@ import {
   type RequestLine,
   type RequestLineRow,
 } from "@/lib/requests";
+import { DEFAULT_RESIN_DIVISOR, JOB_COLUMNS, type Job, type JobFormOptions } from "@/lib/jobs";
+import { MATERIAL_COLUMNS, PRINTER_COLUMNS, type Material, type Printer } from "@/lib/materials";
 
 // Server-side data loading shared by the catalogue and the admin queue.
 // Every query runs as the logged-in user, so RLS applies.
@@ -82,12 +84,65 @@ export async function loadRequestLines(supabase: SupabaseClient) {
   return addPrinting(supabase, rows);
 }
 
-// Adds the "printing" amount to each line.
-// Phase 6: replace the body with a query that sums quantity_planned from
-// print_job_items whose job has status 'printing', grouped by request_line_id.
+// Adds the "printing" amount to each line: the sum of quantity_planned on
+// its items in printing jobs. Read from the request_line_printing view, which
+// the requester may read too (it holds only line ids and numbers).
 export async function addPrinting(
-  _supabase: SupabaseClient,
+  supabase: SupabaseClient,
   rows: RequestLineRow[],
 ): Promise<RequestLine[]> {
-  return rows.map((row) => ({ ...row, printing: 0 }));
+  if (rows.length === 0) return [];
+  const printing = await fetchAll<{ request_line_id: string; printing: number }>((from, to) =>
+    supabase
+      .from("request_line_printing")
+      .select("request_line_id, printing")
+      .range(from, to)
+      .returns<{ request_line_id: string; printing: number }[]>(),
+  );
+  const byLine = new Map(printing.map((p) => [p.request_line_id, p.printing]));
+  return rows.map((row) => ({ ...row, printing: byLine.get(row.id) ?? 0 }));
+}
+
+// Successful prints per model ({ model id: total }), for the NEW badge and
+// the models page.
+export async function loadPrintTotals(supabase: SupabaseClient) {
+  const rows = await fetchAll<{ model_id: string; printed_total: number }>((from, to) =>
+    supabase
+      .from("model_print_totals")
+      .select("model_id, printed_total")
+      .range(from, to)
+      .returns<{ model_id: string; printed_total: number }[]>(),
+  );
+  return Object.fromEntries(rows.map((r) => [r.model_id, r.printed_total])) as Record<string, number>;
+}
+
+// Printers, materials and the resin divisor, for the job form (admin only).
+export async function loadJobFormOptions(supabase: SupabaseClient): Promise<JobFormOptions> {
+  const [printers, materials, setting] = await Promise.all([
+    supabase.from("printers").select(PRINTER_COLUMNS).order("name").returns<Printer[]>(),
+    supabase.from("materials").select(MATERIAL_COLUMNS).order("name").returns<Material[]>(),
+    supabase.from("settings").select("value").eq("key", "resin_charge_divisor").maybeSingle<{ value: string }>(),
+  ]);
+  for (const r of [printers, materials, setting]) if (r.error) throw new Error(r.error.message);
+  const divisor = Number(setting.data?.value);
+  return {
+    printers: printers.data ?? [],
+    materials: materials.data ?? [],
+    divisor: divisor > 0 ? divisor : DEFAULT_RESIN_DIVISOR,
+  };
+}
+
+// Jobs with their items (admin only). `status` "printing" gives every
+// printing job; "history" the most recent finished ones.
+export const HISTORY_LIMIT = 200;
+
+export async function loadJobs(supabase: SupabaseClient, which: "printing" | "history") {
+  let query = supabase.from("print_jobs").select(JOB_COLUMNS);
+  query =
+    which === "printing"
+      ? query.eq("status", "printing").order("started_at")
+      : query.neq("status", "printing").order("started_at", { ascending: false }).limit(HISTORY_LIMIT);
+  const { data, error } = await query.returns<Job[]>();
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }

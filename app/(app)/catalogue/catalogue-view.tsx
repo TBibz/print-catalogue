@@ -20,7 +20,7 @@ import {
   UrgencySelect,
 } from "@/components/request-fields";
 
-type Row = CatalogueModel & { categoryName: string };
+type Row = CatalogueModel & { categoryName: string; printedTotal: number };
 
 // One set of request controls under a model. A model normally has one slot;
 // "+ another size" adds more. `line` is null until something is saved.
@@ -80,10 +80,13 @@ export function CatalogueView({
   categories,
   models,
   lines,
+  printTotals,
 }: {
   categories: Category[];
   models: CatalogueModel[];
   lines: RequestLine[];
+  // Successful prints per model, for the NEW badge.
+  printTotals: Record<string, number>;
 }) {
   const [activeTab, setActiveTab] = useState<string>(ALL);
   const [query, setQuery] = useState("");
@@ -112,9 +115,13 @@ export function CatalogueView({
   const rows = useMemo(() => {
     const names = new Map(categories.map((c) => [c.id, c.name]));
     return models
-      .map((m) => ({ ...m, categoryName: names.get(m.category_id) ?? "" }))
+      .map((m) => ({
+        ...m,
+        categoryName: names.get(m.category_id) ?? "",
+        printedTotal: printTotals[m.id] ?? 0,
+      }))
       .sort(compareModels);
-  }, [categories, models]);
+  }, [categories, models, printTotals]);
 
   // How many models each category has (shown on its tab).
   const counts = useMemo(() => {
@@ -506,7 +513,7 @@ function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
           <ImageIcon />
         </span>
       )}
-      {showNewBadge(model) && (
+      {showNewBadge(model, model.printedTotal) && (
         <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-800">
           NEW
         </span>
@@ -655,6 +662,11 @@ function LineEditor({
       </div>
       <div className={`col-span-3 min-h-5 text-sm ${wide}`}>
         <SaveStatusText status={status} onRetry={retry} />
+        {status.kind === "idle" && slot.line && slot.line.printing > 0 && (
+          <span className="text-neutral-600">
+            {slot.line.quantity} requested · {slot.line.printing} printing
+          </span>
+        )}
         {canRemove && status.kind !== "saving" && (
           <button
             type="button"
