@@ -370,7 +370,7 @@ export function CatalogueView({
           <div className="hidden grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid">
             <span>Code</span>
             <span>Name</span>
-            <span className={`grid gap-2 ${colourHeader ? COLOUR_ROW : PLAIN_ROW}`}>
+            <span className={`grid gap-1.5 ${colourHeader ? COLOUR_ROW : PLAIN_ROW}`}>
               <span>Size</span>
               {colourHeader && <span>Colour</span>}
               <span className="text-center">Qty</span>
@@ -478,10 +478,10 @@ const ModelRow = memo(function ModelRow({
     : {};
 
   return (
-    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b border-neutral-100 px-3 py-4 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-4 xl:py-3">
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-neutral-100 px-3 py-2.5 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-x-4 xl:py-1.5">
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
-        className={`pt-2 font-mono text-sm ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
+        className={`font-mono text-sm leading-5 xl:pt-[7px] ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
         {...imageHandlers}
       >
         {model.code}
@@ -489,7 +489,7 @@ const ModelRow = memo(function ModelRow({
 
       {/* Hover: preview to the right of the pointer. Click: enlarge. */}
       <div
-        className={`min-w-0 xl:pt-2 ${url ? "cursor-zoom-in" : ""}`}
+        className={`min-w-0 xl:pt-[7px] ${url ? "cursor-zoom-in" : ""}`}
         {...imageHandlers}
         {...(url && {
           role: "button",
@@ -568,7 +568,7 @@ const ModelCard = memo(function ModelCard({
           <span className="text-sm text-neutral-400">No image yet</span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-3 p-3">
+      <div className="flex flex-1 flex-col gap-2 p-2.5">
         <div>
           <span className={`font-mono text-sm ${comingSoon ? "text-neutral-400" : "text-neutral-600"}`}>
             {model.code}
@@ -585,7 +585,7 @@ const ModelCard = memo(function ModelCard({
 function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
   const comingSoon = model.availability === "coming_soon";
   return (
-    <div className={comingSoon ? "text-neutral-400" : ""}>
+    <div className={`text-sm leading-5 ${comingSoon ? "text-neutral-400" : ""}`}>
       <span className="break-words">{model.name}</span>
       {hasImage && (
         <span className="ml-1.5 align-middle text-neutral-400" title="Hover to see the image">
@@ -602,7 +602,8 @@ function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
           {AVAILABILITY_LABELS.coming_soon}
         </span>
       )}
-      <span className="block text-xs text-neutral-500">{model.categoryName}</span>
+      {/* On the same line as the name, to keep rows short. */}
+      <span className="text-neutral-500"> · {model.categoryName}</span>
     </div>
   );
 }
@@ -662,7 +663,7 @@ function RequestSlots({
     : undefined;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {slots.map((slot, i) => {
         const others = combos.filter((_, j) => j !== i);
         const mine = combos[i];
@@ -685,26 +686,29 @@ function RequestSlots({
           />
         );
       })}
-      <div className="flex flex-wrap gap-x-4">
-        {hasSizes && unusedScale !== undefined && (
-          <button
-            type="button"
-            onClick={() => onAddSlot(model.id, unusedScale, null)}
-            className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
-          >
-            + another size
-          </button>
-        )}
-        {unusedColour !== undefined && (
-          <button
-            type="button"
-            onClick={() => onAddSlot(model.id, firstScale, unusedColour)}
-            className="py-1 text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
-          >
-            + another colour
-          </button>
-        )}
-      </div>
+      {/* Only take up space when there's a button to show. */}
+      {((hasSizes && unusedScale !== undefined) || unusedColour !== undefined) && (
+        <div className="flex flex-wrap gap-x-4">
+          {hasSizes && unusedScale !== undefined && (
+            <button
+              type="button"
+              onClick={() => onAddSlot(model.id, unusedScale, null)}
+              className="text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
+            >
+              + another size
+            </button>
+          )}
+          {unusedColour !== undefined && (
+            <button
+              type="button"
+              onClick={() => onAddSlot(model.id, firstScale, unusedColour)}
+              className="text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
+            >
+              + another colour
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -760,7 +764,7 @@ function LineEditor({
 
   return (
     <div
-      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 ${
+      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-1.5 ${
         compact ? "" : colourColumn ? XL_COLOUR_ROW : XL_PLAIN_ROW
       }`}
     >

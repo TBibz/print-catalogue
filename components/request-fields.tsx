@@ -6,16 +6,17 @@ import { ANY_COLOUR, colourName, type ColourOption } from "@/lib/colours";
 import { URGENCIES, URGENCY_STYLES, scaleLabel, type Urgency } from "@/lib/requests";
 import type { SaveStatus } from "@/lib/use-line-autosave";
 
-// Every control in a request row is the same height (h-11, 44px), so the
-// quantity, urgency, note and size boxes line up.
-const ROW_HEIGHT = "h-11";
+// Every control in a request row is the same height (h-8.5, 34px: compact,
+// close to the old spreadsheet), so the quantity, urgency, colour, size and
+// note boxes line up. Text stays at 14px.
+const ROW_HEIGHT = "h-8.5";
 
 // Border, height and focus ring, without horizontal padding: each control
 // sets its own left/right padding (mixing px- with pl-/pr- on one element
 // lets whichever comes later in the CSS win, which is how the colour
 // stripe ended up over the text).
-const frame = `${ROW_HEIGHT} rounded-md border border-neutral-300 bg-white py-2 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900`;
-const box = `${frame} px-2.5 text-base`;
+const frame = `${ROW_HEIGHT} rounded-md border border-neutral-300 bg-white py-1 outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900`;
+const box = `${frame} px-2.5 text-sm`;
 
 // Size and colour dropdowns draw their own arrow (appearance-none), because
 // some browsers ignore the padding of a native-looking <select>.
@@ -83,7 +84,7 @@ export function UrgencySelect({
       aria-label={label}
       value={value ?? ""}
       onChange={(e) => onChange((e.target.value || null) as Urgency | null)}
-      className={`${ROW_HEIGHT} w-full cursor-pointer rounded-full border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-1 ${URGENCY_STYLES[value ?? "none"]}`}
+      className={`${ROW_HEIGHT} w-full cursor-pointer rounded-full border px-3 py-1 text-sm font-semibold outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-1 ${URGENCY_STYLES[value ?? "none"]}`}
     >
       <option value="" className="bg-white text-neutral-900">
         —
@@ -133,7 +134,7 @@ export function NoteInput({
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
       }}
-      className={`${frame} w-full pl-2.5 text-base ${roomOnRight ? "pr-20" : "pr-2.5"}`}
+      className={`${frame} w-full pl-2.5 text-sm ${roomOnRight ? "pr-20" : "pr-2.5"}`}
     />
   );
 }

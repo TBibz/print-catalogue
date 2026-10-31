@@ -211,7 +211,7 @@ function QueueLine({
 
   return (
     <li
-      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-2 border-b border-neutral-100 px-3 py-3 lg:gap-3 lg:py-2.5 ${COLUMNS}`}
+      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-1.5 border-b border-neutral-100 px-3 py-2 text-sm lg:gap-x-3 lg:py-1 ${COLUMNS}`}
     >
       {/* Phone: code, name, category and size on one block above the controls */}
       <div className="col-span-3 lg:contents">
@@ -233,7 +233,7 @@ function QueueLine({
             </span>
           )}
         </span>
-        <span className="block text-xs text-neutral-500 lg:text-sm lg:text-neutral-600">
+        <span className="block text-sm text-neutral-500 lg:text-neutral-600">
           {row.categoryName}
           <span className="lg:hidden"> · {scaleLabel(fields.scale, row.defaultScale)}</span>
         </span>
@@ -280,7 +280,7 @@ function QueueLine({
               value={plateQty}
               onChange={(e) => onPlateQty(id, e.target.value.replace(/[^0-9]/g, ""))}
               title={`Up to ${left}`}
-              className={`h-11 w-16 rounded-md border bg-white px-2 py-2 text-center text-base tabular-nums outline-none focus:ring-1 lg:w-full ${
+              className={`h-8.5 w-16 rounded-md border bg-white px-2 py-1 text-center text-sm tabular-nums outline-none focus:ring-1 lg:w-full ${
                 Number(plateQty) > left || Number(plateQty) < 1
                   ? "border-red-600 focus:ring-red-600"
                   : "border-neutral-900 focus:ring-neutral-900"
