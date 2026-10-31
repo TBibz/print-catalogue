@@ -14,10 +14,10 @@ Only these two users. No public sign-up.
 
 ## 2. Tech and conventions
 
-- Next.js (App Router, TypeScript), Tailwind CSS
-- Supabase: Postgres, Auth (email + password), Storage (model images, later)
+- Next.js 16 (App Router, TypeScript, Cache Components on), Tailwind CSS
+- Supabase: Postgres, Auth (email + password), Storage (model images, public `model-images` bucket with random file paths; only the admin can write)
 - Hosted on Vercel, deployed from GitHub
-- Use `@supabase/ssr` for auth in server components, route handlers and middleware
+- Use `@supabase/ssr` for auth in server components, server actions and the proxy (`proxy.ts`, Next.js 16's name for middleware). The proxy requires a session on every page except `/login`.
 - All tables have Row Level Security (RLS) enabled
 - Database changes go in numbered SQL files in `supabase/migrations/` (e.g. `0001_init.sql`). Tomi runs them by hand in the Supabase SQL Editor, so each file must be safe to read and run top to bottom.
 - Multi-step data changes that must happen together (e.g. completing a print job) are Postgres functions called via RPC, not several separate client calls.
@@ -51,7 +51,7 @@ Build tables only when their phase is reached. Names and fields below are the ta
 - `availability`: `available` | `coming_soon` | `hidden`
   - coming_soon = greyed out and labelled "Model Not Ready", but **can still be requested**
   - hidden = retired; not shown in the catalogue, kept for history
-- `image_path` (nullable; some models have no image)
+- `image_path` (nullable; some models have no image). Images are shrunk in the browser to 1000px on white (WebP, JPEG fallback) before upload.
 - `show_new_badge` (bool). The NEW badge shows when this is true AND the model's successful printed total is < 4.
 - `admin_notes` (admin-only), `created_at`, `updated_at`
 - `code_key` (generated: lower(code) with spaces removed), used to match image file names
@@ -63,7 +63,8 @@ One row per model + option combination that Dad currently wants.
 - `id`, `model_id`, `scale` (nullable text; null = model default), `colour_material_id` (nullable, FK materials; Phase 6, BASES only)
 - `quantity` (int > 0: outstanding amount still wanted), `urgency` (nullable: `ASAP` | `URGENT` | `PRIORITY`), `note` (text)
 - `created_at`, `updated_at`
-- Unique on (model_id, scale, colour_material_id), treating nulls as equal.
+- Unique on (model_id, scale, colour_material_id), treating nulls as equal. (Currently unique on (model_id, scale); Phase 6 adds `colour_material_id` and widens the rule.)
+- Deleting a model deletes its request lines (cascade).
 - Setting the quantity to 0/blank deletes the row (the item goes back to blank).
 - Dad cannot set the quantity below the amount currently printing for that line.
 
@@ -75,7 +76,10 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 - `id`, `type` (`resin` | `fdm`), `name` (e.g. "PLA Black", "ABS 2.0 Grey"), `colour`
 - `unit` (`ml` | `g`), `pack_size` (e.g. 1000), `pack_cost` (£)
 - `cost_per_unit` (derived: pack_cost / pack_size), `charge_per_unit` (£ per g for FDM charges; default 2 × cost_per_unit, editable)
+- `charge_overridden` (bool): false = a trigger keeps `charge_per_unit` at 2 × cost; true = set by hand and left alone
 - `in_stock` (bool), `offer_as_colour` (bool: shown as a colour choice for categories with colour options)
+- `active` (bool): false = retired, kept for history, hidden from new print jobs
+- Printers, materials and settings are admin-only. Phase 6 will expose just the BASES colour names to the requester through a separate view.
 - Later: individual spools/bottles and remaining amount.
 
 ### print_jobs (Phase 6) — one job = one plate
@@ -142,13 +146,13 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 
 Everyone:
 - `/login`
-- `/catalogue`: category tabs (All + each category), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view, "Show my requests only" toggle. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing".
+- `/catalogue`: category tabs (All + each category), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing".
 - `/notepad`: handwritten-style font, bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
 
 Admin only:
 - `/admin/queue`: all request lines sorted by the queue rule. Tick lines, set how many go on this plate, choose printer, "Start print". Shows the unticked notepad count.
 - `/admin/jobs`: printing jobs (complete / partial / cancel), history of completed jobs (edit result / revert).
-- `/admin/models`: add, edit, rename, retire, availability, scales, NEW badge, single image upload.
+- `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it.
 - `/admin/upload`: bulk image upload; match file name to `code_key`, create new models for unknown codes (choose a category for the batch), ask before replacing an existing image.
 - `/admin/categories`, `/admin/materials`, `/admin/printers`
 - `/admin/money`: month-by-month costs (purchases), charges for prints, payments received, difference; plus print stats.
@@ -157,7 +161,7 @@ Admin only:
 ## 7. Phases
 
 1. **Foundations:** project setup, auth, profiles/roles, categories + models, catalogue import from CSV, read-only catalogue list view with category tabs and search. Deploy.
-2. **Requests:** request_lines, inline quantity/urgency/note with autosave, scale choice, my-requests toggle, admin queue (read-only, plus admin can edit quantities).
+2. **Requests:** request_lines, inline quantity/urgency/note with autosave, scale choice, "Show all current requests" toggle, admin queue (read-only, plus admin can edit quantities).
 3. **Notepad + model admin:** notepad page; admin add/edit/retire models, scales, NEW badge.
 4. **Images:** storage bucket, bulk upload, grid view, hover preview.
 5. **Materials and printers:** materials index, printers, settings. These come first because the job form needs them.
@@ -167,7 +171,7 @@ Admin only:
 
 ## 8. Catalogue import (Phase 1)
 
-Source: `data/catalogue.csv`, exported from the CATALOGUE tab. Columns in order:
+Source: `data/CATALOGUE.csv` (any capitalisation is found), exported from the CATALOGUE tab. Columns in order:
 `(flag)`, `ITEM CODE`, `ITEM`, `CATEGORY`, `Note`, `Requests`, `URGENCY`
 
 - Header row is the first row. The first column has no heading.
@@ -178,3 +182,4 @@ Source: `data/catalogue.csv`, exported from the CATALOGUE tab. Columns in order:
 - Skip empty rows. Report duplicates or blank names and do not import them.
 - Upsert by `code`, so re-running is safe.
 - Run with the service role key from `.env.local`, never from the browser. Support a `--dry-run` flag that prints what would happen.
+- **Initial setup only.** Once models are edited in the app, don't re-run it: it would overwrite names, categories, availability and NEW badges from the CSV.
