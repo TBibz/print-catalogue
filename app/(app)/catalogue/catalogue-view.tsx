@@ -53,7 +53,8 @@ export function CatalogueView({
 }) {
   const [activeTab, setActiveTab] = useState<string>(ALL);
   const [query, setQuery] = useState("");
-  const [myRequestsOnly, setMyRequestsOnly] = useState(false);
+  // Shows only models with a request line, whoever asked for it.
+  const [requestedOnly, setRequestedOnly] = useState(false);
 
   // Request slots per model, starting from the saved lines.
   const [slotsByModel, setSlotsByModel] = useState(() => slotsFromLines(lines));
@@ -138,7 +139,7 @@ export function CatalogueView({
   // Each word typed must appear in the code, name, category or a note.
   const visible = rows.filter((r) => {
     const lines = savedLines(r.id);
-    if (myRequestsOnly && lines.length === 0) return false;
+    if (requestedOnly && lines.length === 0) return false;
     if (searching) {
       const notes = lines.map((l) => l.note).join(" ");
       const haystack = `${r.code} ${r.name} ${r.categoryName} ${notes}`.toLowerCase();
@@ -166,11 +167,11 @@ export function CatalogueView({
         <label className="flex cursor-pointer items-center gap-2.5 py-1 text-base select-none">
           <input
             type="checkbox"
-            checked={myRequestsOnly}
-            onChange={(e) => setMyRequestsOnly(e.target.checked)}
+            checked={requestedOnly}
+            onChange={(e) => setRequestedOnly(e.target.checked)}
             className="h-5 w-5 cursor-pointer accent-neutral-900"
           />
-          Show my requests only
+          Show all current requests
         </label>
       </div>
 
@@ -208,8 +209,8 @@ export function CatalogueView({
 
       {visible.length === 0 ? (
         <p className="py-12 text-center text-neutral-500">
-          {myRequestsOnly && !searching
-            ? "You haven’t requested anything in this view yet."
+          {requestedOnly && !searching
+            ? "Nothing has been requested in this view yet."
             : `Nothing matches “${query}”.`}
         </p>
       ) : (
