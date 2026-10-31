@@ -1,17 +1,18 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   deleteCategory,
   reorderCategories,
   saveCategory,
+  setCategoryDefaultScale,
   type CategoryInput,
 } from "@/app/actions/categories";
-import { compareCategories, type Category } from "@/lib/catalogue";
+import { compareCategories, USUAL_SCALES, type Category } from "@/lib/catalogue";
 import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
 import { ColourPicker } from "@/components/colour-picker";
 
-const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_4rem_9rem_5rem_11rem]";
+const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_4rem_8rem_4.5rem_15.5rem]";
 const box =
   "h-11 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 
@@ -216,6 +217,7 @@ function CategoryRow({
   });
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [scalePanel, setScalePanel] = useState(false);
   // The row can only be dragged by its handle, not from the name box.
   const [handleHeld, setHandleHeld] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -352,6 +354,18 @@ function CategoryRow({
           >
             {pending ? "Saving…" : category ? "Save" : "Add"}
           </button>
+          {category && (
+            <button
+              type="button"
+              onClick={() => setScalePanel((open) => !open)}
+              aria-expanded={scalePanel}
+              disabled={modelCount === 0}
+              title={modelCount === 0 ? "This category has no models" : "Set the default scale of its models"}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-30"
+            >
+              Set scale…
+            </button>
+          )}
           {category ? (
             <button
               type="button"
@@ -380,6 +394,10 @@ function CategoryRow({
         </p>
       )}
 
+      {scalePanel && category && (
+        <ScalePanel category={category} onClose={() => setScalePanel(false)} />
+      )}
+
       {confirmingDelete && category && (
         <div role="alertdialog" aria-label="Confirm delete" className="mt-2 rounded-md border border-red-300 bg-red-50 p-3">
           <p className="text-red-900">Delete the empty category {category.name} for good?</p>
@@ -404,5 +422,156 @@ function CategoryRow({
         </div>
       )}
     </li>
+  );
+}
+
+// "Set default scale": the scale, which models, optional extra sizes, and a
+// confirm button that says how many models will change (asked of the
+// database as you type, without changing anything).
+function ScalePanel({ category, onClose }: { category: Category; onClose: () => void }) {
+  const [scale, setScale] = useState("");
+  const [onlyUnset, setOnlyUnset] = useState(true);
+  const [extra, setExtra] = useState("");
+  const [preview, setPreview] = useState<{ key: string; count: number } | { key: string; error: string } | null>(
+    null,
+  );
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const addScales = extra
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const key = JSON.stringify([scale.trim(), onlyUnset, addScales]);
+
+  // Ask how many models would change, after a short pause in typing.
+  useEffect(() => {
+    if (!scale.trim()) return;
+    const timer = setTimeout(async () => {
+      const r = await setCategoryDefaultScale({
+        categoryId: category.id,
+        scale,
+        onlyUnset,
+        addScales,
+        dryRun: true,
+      });
+      setPreview(r.ok ? { key, count: r.count } : { key, error: r.error });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key covers scale, onlyUnset and addScales
+  }, [key, category.id]);
+
+  const current = preview && preview.key === key ? preview : null;
+  const count = current && "count" in current ? current.count : null;
+
+  function apply() {
+    startTransition(async () => {
+      const r = await setCategoryDefaultScale({ categoryId: category.id, scale, onlyUnset, addScales, dryRun: false });
+      if (!r.ok) return setResult({ ok: false, text: r.error });
+      setResult({ ok: true, text: `Updated ${r.count} ${r.count === 1 ? "model" : "models"} ✓` });
+      setPreview(null);
+    });
+  }
+
+  const listId = `scales-${category.id}`;
+  return (
+    <div className="mt-3 rounded-md border border-neutral-300 bg-neutral-50 p-4">
+      <h3 className="mb-3 font-medium">Set the default scale for {category.name}</h3>
+      <div className="flex flex-wrap items-start gap-6">
+        <div>
+          <label htmlFor={`${listId}-scale`} className="mb-1 block text-sm text-neutral-700">
+            Default scale
+          </label>
+          <input
+            id={`${listId}-scale`}
+            list={listId}
+            value={scale}
+            maxLength={20}
+            autoFocus
+            placeholder="e.g. 70mm"
+            onChange={(e) => {
+              setScale(e.target.value);
+              setResult(null);
+            }}
+            className={`${box} w-36`}
+          />
+          <datalist id={listId}>
+            {USUAL_SCALES.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        </div>
+        <fieldset>
+          <legend className="mb-1 text-sm text-neutral-700">Which models</legend>
+          <label className="flex cursor-pointer items-center gap-2 py-1 text-sm">
+            <input
+              type="radio"
+              checked={onlyUnset}
+              onChange={() => setOnlyUnset(true)}
+              className="h-4 w-4 accent-neutral-900"
+            />
+            Only models with no scale set
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 py-1 text-sm">
+            <input
+              type="radio"
+              checked={!onlyUnset}
+              onChange={() => setOnlyUnset(false)}
+              className="h-4 w-4 accent-neutral-900"
+            />
+            All models in this category (overwrites)
+          </label>
+        </fieldset>
+        <div>
+          <label htmlFor={`${listId}-extra`} className="mb-1 block text-sm text-neutral-700">
+            Other scales to add (optional)
+          </label>
+          <input
+            id={`${listId}-extra`}
+            value={extra}
+            placeholder="e.g. 54mm, 100mm"
+            onChange={(e) => {
+              setExtra(e.target.value);
+              setResult(null);
+            }}
+            className={`${box} w-56`}
+          />
+          <p className="mt-1 text-xs text-neutral-500">Separate with commas.</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={apply}
+          disabled={pending || !scale.trim() || !count}
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-30"
+        >
+          {pending
+            ? "Updating…"
+            : count === null
+              ? "Set scale"
+              : `Set ${scale.trim()} on ${count} ${count === 1 ? "model" : "models"}`}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+        >
+          Close
+        </button>
+        {scale.trim() && count === 0 && <span className="text-sm text-neutral-600">No models would change.</span>}
+        {current && "error" in current && (
+          <span role="alert" className="text-sm text-red-700">
+            {current.error}
+          </span>
+        )}
+        {result && (
+          <span role={result.ok ? "status" : "alert"} className={`text-sm ${result.ok ? "text-green-700" : "text-red-700"}`}>
+            {result.text}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

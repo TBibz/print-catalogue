@@ -80,3 +80,30 @@ export async function reorderCategories(ids: string[]): Promise<{ ok: true } | F
   }
   return { ok: true };
 }
+
+// Sets the default scale on a category's models in one step (see
+// 0015_bulk_default_scale.sql). With dryRun it changes nothing and just
+// says how many models would change.
+export async function setCategoryDefaultScale(input: {
+  categoryId: string;
+  scale: string;
+  onlyUnset: boolean;
+  addScales: string[];
+  dryRun: boolean;
+}): Promise<{ ok: true; count: number } | Fail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_category_default_scale", {
+    p_category_id: input.categoryId,
+    p_scale: input.scale,
+    p_only_unset: input.onlyUnset,
+    p_add_scales: input.addScales,
+    p_dry_run: input.dryRun,
+  });
+  if (error) {
+    console.error("set_category_default_scale:", error.message);
+    // P0001: a message from the function, e.g. "Enter a scale, e.g. 70mm."
+    return { ok: false, error: error.code === "P0001" ? error.message : "Couldn't update the models. Please try again." };
+  }
+  return { ok: true, count: Number(data) || 0 };
+}
