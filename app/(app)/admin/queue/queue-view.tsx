@@ -211,7 +211,7 @@ function QueueLine({
 
   return (
     <li
-      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-1.5 border-b border-neutral-100 px-3 py-2 text-sm lg:gap-x-3 lg:py-1 ${COLUMNS}`}
+      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-1.5 border-b border-neutral-100 px-3 py-2 text-sm even:bg-neutral-50 lg:gap-x-3 lg:py-1 ${COLUMNS}`}
     >
       {/* Phone: code, name, category and size on one block above the controls */}
       <div className="col-span-3 lg:contents">

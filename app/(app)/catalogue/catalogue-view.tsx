@@ -478,7 +478,8 @@ const ModelRow = memo(function ModelRow({
     : {};
 
   return (
-    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-neutral-100 px-3 py-2.5 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-x-4 xl:py-1.5">
+    // Every other row has a very light grey background, like a spreadsheet.
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-neutral-100 px-3 py-2.5 even:bg-neutral-50 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-x-4 xl:py-1.5">
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
         className={`font-mono text-sm leading-5 xl:pt-[7px] ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
