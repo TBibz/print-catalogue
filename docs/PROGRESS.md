@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (Phase 8: future-proofing and polish)_
+_Last updated: 2026-10-31 (single-line catalogue rows)_
 
 ## Phases
 
@@ -86,6 +86,15 @@ _Last updated: 2026-10-31 (Phase 8: future-proofing and polish)_
 - Column widths (xl): Code 5rem, Size 5.5rem, Colour 12.5rem (fits "Sky Blue (out of stock)"), Qty 4rem, Urgency 7rem, Note takes the rest (about 15rem at 1280px, the widest). The status column is gone: "Saving…" / "Saved ✓" show inside the Note box, and errors / "N requested · M printing" / Remove on a line underneath
 - Checked with sample data in the browser pane at 1280px (list and grid view), using a temporary preview page that wasn't committed
 
+### Single-line catalogue rows: Done
+- Controls 30px, rows about 4px padding, everything vertically centred (catalogue list, grid controls, queue)
+- No category line: on "All" a small category tag (stripe + name) in its own column; none inside a category
+- Long names truncate with "…" (full name on hover); names never shrink below 8rem
+- "+ another size / colour" links replaced by a small "+" right of the size / colour dropdown (first line only), with a tooltip
+- Alternate rows soft lavender grey (#f3f1f8); NEW gold still wins
+- Sidebar 10rem; pages can grow to 96rem on wide screens. At 1280px on "All" (which has a Colour column because of BASES) the Note box is about 11rem; at 1512px about 15rem; inside a category without colours it's much wider
+- Checked with sample data in the browser pane at 1280px and 1512px (list and grid), using a temporary preview page that wasn't committed
+
 ### 7. Money and stats: Done (not yet tested against the real database)
 - `0012_money.sql`: `monthly_money` (admin only), settings `opening_balance` and `money_start_month` (defaults to the first completed job's month), `money_by_month()` (Europe/London months, every job, newest first) and `print_stats_by_printer()`. Checked in PGlite: a job finished at 23:30 UTC on 30 June counts in July, cancelled jobs don't count, Dad gets no rows, half-month dates are refused, safe to run twice
 - `/admin/money` ("Money" in the header): running total, Starting balance (opening balance + first month), table newest first with autosaving Payments and Costs, "Materials from jobs" reference, coloured differences, all-time stats per printer and top 10 models
@@ -140,7 +149,7 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
 - Drag-and-drop on the Categories page needs a mouse; on a phone or tablet use the ↑ ↓ buttons.
 - Custom domain (Phase 8) not done: it's set up in Vercel and your domain registrar, not in code.
-- The catalogue's name column is narrow at 1280px (long names wrap onto two lines) because the controls take most of the row.
+- On "All" at 1280px the Note box is narrower than the Colour box (the Colour box must fit "Sky Blue (out of stock)"); wider screens and single categories have more room.
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 - Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
 

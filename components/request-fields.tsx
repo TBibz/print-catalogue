@@ -6,10 +6,10 @@ import { ANY_COLOUR, colourName, type ColourOption } from "@/lib/colours";
 import { URGENCIES, URGENCY_STYLES, scaleLabel, type Urgency } from "@/lib/requests";
 import type { SaveStatus } from "@/lib/use-line-autosave";
 
-// Every control in a request row is the same height (h-8.5, 34px: compact,
-// close to the old spreadsheet), so the quantity, urgency, colour, size and
-// note boxes line up. Text stays at 14px.
-const ROW_HEIGHT = "h-8.5";
+// Every control in a request row is the same height (h-7.5, 30px: as
+// compact as the old spreadsheet), so the quantity, urgency, colour, size
+// and note boxes line up. Text stays at 14px.
+const ROW_HEIGHT = "h-7.5";
 
 // Border, height and focus ring, without horizontal padding: each control
 // sets its own left/right padding (mixing px- with pl-/pr- on one element
@@ -234,6 +234,22 @@ export function ColourSelect({
       </select>
       <SelectArrow />
     </div>
+  );
+}
+
+// The small "+" right of a size or colour dropdown that adds another line
+// for the same model (in another size or colour).
+export function AddLineButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`${ROW_HEIGHT} w-7 shrink-0 rounded-md border border-neutral-300 bg-white text-base leading-none text-neutral-600 hover:border-neutral-500 hover:bg-neutral-100 hover:text-neutral-900`}
+    >
+      +
+    </button>
   );
 }
 

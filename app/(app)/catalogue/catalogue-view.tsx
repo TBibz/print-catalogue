@@ -16,6 +16,7 @@ import { isLightColour, textColourOn, type ColourOption } from "@/lib/colours";
 import { ColourStripe } from "@/components/colour-label";
 import type { CategoryCounts } from "@/lib/data";
 import {
+  AddLineButton,
   ColourSelect,
   NoteInput,
   QuantityInput,
@@ -26,6 +27,7 @@ import {
 
 type Row = CatalogueModel & {
   categoryName: string;
+  categoryColour: string;
   categorySort: number;
   hasColours: boolean; // the category offers colour choices (e.g. BASES)
   printedTotal: number;
@@ -147,6 +149,7 @@ export function CatalogueView({
       .map((m) => ({
         ...m,
         categoryName: byId.get(m.category_id)?.name ?? "",
+        categoryColour: byId.get(m.category_id)?.colour_hex ?? "#9ca3af",
         categorySort: byId.get(m.category_id)?.sort_order ?? 0,
         hasColours: byId.get(m.category_id)?.has_colour_options ?? false,
         printedTotal: printTotals[m.id] ?? 0,
@@ -236,6 +239,8 @@ export function CatalogueView({
   // When any row shown offers colours, every row gets a Colour column (blank
   // where there's no choice), so the headings line up with every row.
   const colourHeader = visible.some((r) => r.hasColours);
+  // Within one category its name would just repeat on every row.
+  const showCategory = shownTab === ALL;
 
   // Choosing a category clears the search (search covers every category).
   const chooseCategory = (id: string) => {
@@ -286,7 +291,7 @@ export function CatalogueView({
       {/* Categories: a sidebar on laptops, a dropdown on phones and tablets.
           Search always looks across every category. */}
       <div className="lg:flex lg:items-start lg:gap-6">
-        <aside className="hidden w-48 shrink-0 lg:block">
+        <aside className="hidden w-40 shrink-0 lg:block">
           <nav
             aria-label="Categories"
             className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto border-r border-neutral-200 pr-3"
@@ -362,6 +367,7 @@ export function CatalogueView({
               onAddSlot={handleAddSlot}
               colours={colours}
               colourColumn={false}
+              showCategory={showCategory}
               onOpenImage={openImage}
             />
           ))}
@@ -369,9 +375,14 @@ export function CatalogueView({
       ) : (
         <div className="border-t border-neutral-200">
           {/* Column headings (laptop/desktop only) */}
-          <div className="hidden grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid">
+          <div
+            className={`hidden gap-x-3 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase xl:grid ${
+              OUTER[outerKey(showCategory, colourHeader)]
+            }`}
+          >
             <span>Code</span>
             <span>Name</span>
+            {showCategory && <span>Category</span>}
             <span className={`grid gap-1.5 ${colourHeader ? COLOUR_ROW : PLAIN_ROW}`}>
               <span>Size</span>
               {colourHeader && <span>Colour</span>}
@@ -392,6 +403,7 @@ export function CatalogueView({
                 onAddSlot={handleAddSlot}
                 colours={colours}
                 colourColumn={colourHeader}
+                showCategory={showCategory}
                 onOpenImage={openImage}
               />
             ))}
@@ -458,11 +470,34 @@ type ModelItemProps = SlotCallbacks & {
   version: number;
   colours: ColourOption[]; // for categories with colour options
   colourColumn: boolean; // list view: keep a Colour column on every row
+  showCategory: boolean; // on "All" (or while searching): show a category tag
 };
 
 type ImageProps = { onOpenImage: (model: Row) => void };
 
 const PREVIEW_SIZE = 288; // px, the hover preview box
+
+// Every other list row: a soft lavender grey, visible but subtle.
+const ALT_ROW = "even:bg-[#f3f1f8]";
+
+// List row columns from xl: code, name (never squeezed below 8rem), the
+// category tag (on "All" only), then the controls. Lists with a Colour
+// column give the controls more room. Keyed by [category?][colour?] and
+// written out in full (with and without xl:) so Tailwind finds them.
+const OUTER: Record<string, string> = {
+  "00": "grid-cols-[4.5rem_minmax(8rem,1fr)_minmax(0,40rem)]",
+  "01": "grid-cols-[4.5rem_minmax(8rem,1fr)_minmax(0,47rem)]",
+  "10": "grid-cols-[4.5rem_minmax(8rem,1fr)_6.5rem_minmax(0,40rem)]",
+  "11": "grid-cols-[4.5rem_minmax(8rem,1fr)_6.5rem_minmax(0,47rem)]",
+};
+const XL_OUTER: Record<string, string> = {
+  "00": "xl:grid-cols-[4.5rem_minmax(8rem,1fr)_minmax(0,40rem)]",
+  "01": "xl:grid-cols-[4.5rem_minmax(8rem,1fr)_minmax(0,47rem)]",
+  "10": "xl:grid-cols-[4.5rem_minmax(8rem,1fr)_6.5rem_minmax(0,40rem)]",
+  "11": "xl:grid-cols-[4.5rem_minmax(8rem,1fr)_6.5rem_minmax(0,47rem)]",
+};
+const outerKey = (showCategory: boolean, colourColumn: boolean) =>
+  `${showCategory ? 1 : 0}${colourColumn ? 1 : 0}`;
 
 // Light gold for NEW models' rows and cards (takes priority over the
 // alternating grey).
@@ -475,6 +510,7 @@ const ModelRow = memo(function ModelRow({
   model,
   slots,
   version,
+  showCategory,
   onOpenImage,
   ...callbacks
 }: ModelItemProps & ImageProps) {
@@ -499,16 +535,17 @@ const ModelRow = memo(function ModelRow({
     : {};
 
   return (
-    // Every other row has a very light grey background, like a spreadsheet;
-    // NEW models get a light gold row instead, like the old sheet.
+    // One line per model where possible, everything on the same centre line.
+    // Every other row has a soft lavender-grey background, like a
+    // spreadsheet; NEW models get a light gold row instead, like the old sheet.
     <li
-      className={`grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-neutral-100 px-3 py-2.5 xl:grid-cols-[5rem_minmax(0,1fr)_minmax(0,46rem)] xl:items-start xl:gap-x-4 xl:py-1.5 ${
-        isNew ? NEW_ROW : "even:bg-neutral-50"
-      }`}
+      className={`grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1 border-b border-neutral-100 px-3 py-1.5 xl:py-1 ${
+        XL_OUTER[outerKey(showCategory, callbacks.colourColumn)]
+      } ${isNew ? NEW_ROW : ALT_ROW}`}
     >
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
-        className={`font-mono text-sm leading-5 xl:pt-[7px] ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
+        className={`font-mono text-sm leading-5 ${comingSoon ? "text-neutral-400" : ""} ${url ? "cursor-zoom-in" : ""}`}
         {...imageHandlers}
       >
         {model.code}
@@ -516,7 +553,7 @@ const ModelRow = memo(function ModelRow({
 
       {/* Hover: preview to the right of the pointer. Click: enlarge. */}
       <div
-        className={`min-w-0 xl:pt-[7px] ${url ? "cursor-zoom-in" : ""}`}
+        className={`min-w-0 ${url ? "cursor-zoom-in" : ""}`}
         {...imageHandlers}
         {...(url && {
           role: "button",
@@ -530,13 +567,26 @@ const ModelRow = memo(function ModelRow({
           },
         })}
       >
-        <ModelInfo model={model} hasImage={Boolean(url)} />
+        {/* Below xl the category tag sits after the name; from xl it has its own column. */}
+        <ModelInfo model={model} hasImage={Boolean(url)} showCategory={showCategory} oneLine />
       </div>
+      {showCategory && (
+        <span className="hidden min-w-0 xl:flex">
+          <CategoryTag name={model.categoryName} colour={model.categoryColour} />
+        </span>
+      )}
       {pointer && url && <HoverPreview url={url} pointer={pointer} />}
 
       {/* Below xl (phones, tablets, small laptops) the controls sit under the name. */}
       <div className="col-span-2 xl:col-span-1">
-        <RequestSlots model={model} slots={slots} version={version} compact={false} {...callbacks} />
+        <RequestSlots
+          model={model}
+          slots={slots}
+          version={version}
+          showCategory={showCategory}
+          compact={false}
+          {...callbacks}
+        />
       </div>
     </li>
   );
@@ -567,6 +617,7 @@ const ModelCard = memo(function ModelCard({
   model,
   slots,
   version,
+  showCategory,
   onOpenImage,
   ...callbacks
 }: ModelItemProps & ImageProps) {
@@ -599,43 +650,75 @@ const ModelCard = memo(function ModelCard({
           <span className="text-sm text-neutral-400">No image yet</span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-2.5">
+      <div className="flex flex-1 flex-col gap-1.5 p-2.5">
         <div>
           <span className={`font-mono text-sm ${comingSoon ? "text-neutral-400" : "text-neutral-600"}`}>
             {model.code}
           </span>
-          <ModelInfo model={model} hasImage={false} />
+          <ModelInfo model={model} hasImage={false} showCategory={showCategory} oneLine={false} />
         </div>
-        <RequestSlots model={model} slots={slots} version={version} compact {...callbacks} />
+        <RequestSlots model={model} slots={slots} version={version} showCategory={showCategory} compact {...callbacks} />
       </div>
     </li>
   );
 });
 
-// Name, badges and category.
-function ModelInfo({ model, hasImage }: { model: Row; hasImage: boolean }) {
+// Name, badges and (on "All") a category tag. In the list (oneLine) a long
+// name is cut short with "…" and shown in full on hover; on grid cards it
+// wraps.
+function ModelInfo({
+  model,
+  hasImage,
+  showCategory,
+  oneLine,
+}: {
+  model: Row;
+  hasImage: boolean;
+  showCategory: boolean;
+  oneLine: boolean;
+}) {
   const comingSoon = model.availability === "coming_soon";
   return (
-    <div className={`text-sm leading-5 ${comingSoon ? "text-neutral-400" : ""}`}>
-      <span className="break-words">{model.name}</span>
+    <div
+      className={`flex min-w-0 items-center gap-x-1.5 text-sm leading-5 ${oneLine ? "" : "flex-wrap"} ${
+        comingSoon ? "text-neutral-400" : ""
+      }`}
+    >
+      <span
+        className={oneLine ? "min-w-[4rem] truncate" : "break-words"}
+        title={oneLine ? model.name : undefined}
+      >
+        {model.name}
+      </span>
       {hasImage && (
-        <span className="ml-1.5 align-middle text-neutral-400" title="Hover to see the image">
+        <span className="shrink-0 text-neutral-400" title="Hover to see the image">
           <ImageIcon />
         </span>
       )}
       {showNewBadge(model, model.printedTotal) && (
-        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-800">
-          NEW
-        </span>
+        <span className="shrink-0 rounded bg-amber-100 px-1.5 text-xs leading-5 font-semibold text-amber-800">NEW</span>
       )}
       {comingSoon && (
-        <span className="ml-2 rounded border border-neutral-300 px-1.5 py-0.5 align-middle text-xs whitespace-nowrap text-neutral-500 italic">
+        <span className="shrink-0 rounded border border-neutral-300 px-1.5 text-xs leading-[18px] whitespace-nowrap text-neutral-500 italic">
           {AVAILABILITY_LABELS.coming_soon}
         </span>
       )}
-      {/* On the same line as the name, to keep rows short. */}
-      <span className="text-neutral-500"> · {model.categoryName}</span>
+      {showCategory && (
+        <span className={oneLine ? "contents xl:hidden" : "contents"}>
+          <CategoryTag name={model.categoryName} colour={model.categoryColour} />
+        </span>
+      )}
     </div>
+  );
+}
+
+// A small category tag: its colour stripe and name.
+function CategoryTag({ name, colour }: { name: string; colour: string }) {
+  return (
+    <span className="inline-flex max-w-[8rem] min-w-0 shrink-0 items-center gap-1 text-xs text-neutral-600" title={name}>
+      <ColourStripe hex={colour} />
+      <span className="truncate">{name}</span>
+    </span>
   );
 }
 
@@ -656,14 +739,16 @@ function ImageIcon() {
 // stock)"); longer names are cut off in the box but shown in full when open.
 // "Saved ✓" shows inside the Note box, and longer messages (errors,
 // "N requested · M printing") on a line underneath, so they need no column.
-const PLAIN_ROW = "grid-cols-[5.5rem_4rem_7rem_minmax(0,1fr)]";
-const COLOUR_ROW = "grid-cols-[5.5rem_12.5rem_4rem_7rem_minmax(0,1fr)]";
+// Size and Colour leave room for the small "+" (another size / colour).
+const PLAIN_ROW = "grid-cols-[7.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
+const COLOUR_ROW = "grid-cols-[7.25rem_13.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
 // The same with the xl: prefix, written out in full so Tailwind finds them.
-const XL_PLAIN_ROW = "xl:grid-cols-[5.5rem_4rem_7rem_minmax(0,1fr)]";
-const XL_COLOUR_ROW = "xl:grid-cols-[5.5rem_12.5rem_4rem_7rem_minmax(0,1fr)]";
+const XL_PLAIN_ROW = "xl:grid-cols-[7.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
+const XL_COLOUR_ROW = "xl:grid-cols-[7.25rem_13.25rem_3.5rem_6.5rem_minmax(0,1fr)]";
 
-// All the request lines for one model, plus "+ another size" and (for
-// categories with colours) "+ another colour".
+// All the request lines for one model. The first line has a small "+"
+// beside its size (and, for categories with colours, its colour) dropdown
+// to add another line in a different size or colour.
 function RequestSlots({
   model,
   slots: storedSlots,
@@ -694,7 +779,7 @@ function RequestSlots({
     : undefined;
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       {slots.map((slot, i) => {
         const others = combos.filter((_, j) => j !== i);
         const mine = combos[i];
@@ -714,32 +799,18 @@ function RequestSlots({
             onRemoved={onRemoved}
             canRemove={i > 0 && !slot.line}
             compact={compact}
+            // The "+" buttons sit on the first line only.
+            onAddSize={
+              i === 0 && hasSizes && unusedScale !== undefined
+                ? () => onAddSlot(model.id, unusedScale, null)
+                : undefined
+            }
+            onAddColour={
+              i === 0 && unusedColour !== undefined ? () => onAddSlot(model.id, firstScale, unusedColour) : undefined
+            }
           />
         );
       })}
-      {/* Only take up space when there's a button to show. */}
-      {((hasSizes && unusedScale !== undefined) || unusedColour !== undefined) && (
-        <div className="flex flex-wrap gap-x-4">
-          {hasSizes && unusedScale !== undefined && (
-            <button
-              type="button"
-              onClick={() => onAddSlot(model.id, unusedScale, null)}
-              className="text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
-            >
-              + another size
-            </button>
-          )}
-          {unusedColour !== undefined && (
-            <button
-              type="button"
-              onClick={() => onAddSlot(model.id, firstScale, unusedColour)}
-              className="text-sm text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
-            >
-              + another colour
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -757,6 +828,8 @@ function LineEditor({
   onRemoved,
   canRemove,
   compact,
+  onAddSize,
+  onAddColour,
 }: {
   model: Row;
   slot: Slot;
@@ -770,6 +843,8 @@ function LineEditor({
   onRemoved: (modelId: string, key: string) => void;
   canRemove: boolean; // an extra, unsaved size line can be removed
   compact: boolean; // true in grid cards: always the stacked layout
+  onAddSize?: () => void; // shows a "+" beside the size dropdown
+  onAddColour?: () => void; // shows a "+" beside the colour dropdown
 }) {
   const { fields, status, update, commit, retry } = useLineAutosave({
     modelId: model.id,
@@ -801,15 +876,20 @@ function LineEditor({
     >
       <div className={`col-span-3 text-sm text-neutral-600 ${wide}`}>
         {hasSizes ? (
-          <ScaleSelect
-            label={`Size for ${what}`}
-            value={fields.scale}
-            options={sizeOptions}
-            defaultScale={model.default_scale}
-            disabledOptions={takenScales}
-            locked={locked}
-            onChange={(v) => update("scale", v, "now")}
-          />
+          <div className="flex gap-1">
+            <div className="min-w-0 flex-1">
+              <ScaleSelect
+                label={`Size for ${what}`}
+                value={fields.scale}
+                options={sizeOptions}
+                defaultScale={model.default_scale}
+                disabledOptions={takenScales}
+                locked={locked}
+                onChange={(v) => update("scale", v, "now")}
+              />
+            </div>
+            {onAddSize && <AddLineButton label="Add another size" onClick={onAddSize} />}
+          </div>
         ) : (
           <span className={compact ? "" : "xl:pl-1"}>
             <span className={`text-neutral-400 ${compact ? "" : "xl:hidden"}`}>Size: </span>
@@ -820,15 +900,18 @@ function LineEditor({
       {/* No colour choice, but the list has a Colour column: keep its place. */}
       {!model.hasColours && colourColumn && !compact && <div aria-hidden className="hidden xl:block" />}
       {model.hasColours && (
-        <div className={`col-span-3 ${wide}`}>
-          <ColourSelect
-            label={`Colour for ${what}`}
-            value={fields.colourId}
-            options={colours}
-            disabledOptions={takenColours}
-            locked={locked}
-            onChange={(v) => update("colourId", v, "now")}
-          />
+        <div className={`col-span-3 flex gap-1 ${wide}`}>
+          <div className="min-w-0 flex-1">
+            <ColourSelect
+              label={`Colour for ${what}`}
+              value={fields.colourId}
+              options={colours}
+              disabledOptions={takenColours}
+              locked={locked}
+              onChange={(v) => update("colourId", v, "now")}
+            />
+          </div>
+          {onAddColour && <AddLineButton label="Add another colour" onClick={onAddColour} />}
         </div>
       )}
       <QuantityInput
@@ -864,7 +947,7 @@ function LineEditor({
       </div>
       {/* Messages that stay (errors, printing, Remove) get a line underneath. */}
       {(slowStatus || printing > 0 || showRemove) && (
-        <div className="col-span-3 text-sm xl:col-span-full">
+        <div className="col-span-3 text-sm leading-4 xl:col-span-full">
           {slowStatus && <SaveStatusText status={status} onRetry={retry} />}
           {printing > 0 && slot.line && (
             <span className={`text-neutral-600 ${slowStatus ? "ml-2" : ""}`}>

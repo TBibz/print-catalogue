@@ -9,7 +9,7 @@ import { getCurrentProfile } from "@/lib/auth";
 export function SiteHeader() {
   return (
     <header className="border-b border-neutral-200">
-      <div className="mx-auto flex min-h-14 w-full max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 sm:px-6">
+      <div className="mx-auto flex min-h-14 w-full max-w-[96rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 sm:px-6">
         <Link href="/catalogue" className="text-lg font-semibold">
           Print Catalogue
         </Link>
