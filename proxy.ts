@@ -8,8 +8,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except Next.js internals and static files.
+  // Run on everything except Next.js internals and static files. The web
+  // app manifest is left out too: phones fetch it without the login cookie,
+  // so it must not be sent to /login.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };
