@@ -12,6 +12,7 @@ import {
   CUSTOMER_COLUMNS,
   INVOICE_LINE_COLUMNS,
   invoiceFileName,
+  PDF_ATTACHED_LINE,
   type Customer,
   type InvoiceLine,
 } from "@/lib/invoices";
@@ -218,6 +219,14 @@ export async function deleteDraft(id: string): Promise<Done> {
 
 // ---- Sending -----------------------------------------------------------------------
 
+// The message as typed, plus "The invoice is attached as a PDF." at the end
+// if it isn't in there already.
+function withAttachedLine(message: string) {
+  const text = message.trimEnd();
+  if (text.includes(PDF_ATTACHED_LINE)) return text;
+  return text ? `${text}\n\n${PDF_ATTACHED_LINE}` : PDF_ATTACHED_LINE;
+}
+
 export async function sendInvoice(
   id: string,
   input: { to: string; subject: string; message: string; saveAsCustomer: boolean; customerName: string },
@@ -247,7 +256,7 @@ export async function sendInvoice(
     replyTo: company.email,
     to,
     subject,
-    text: input.message,
+    text: withAttachedLine(input.message),
     attachments: [{ filename: invoiceFileName(invoice, company.name), content: pdf, contentType: "application/pdf" }],
   });
   if (!sent.ok) return sent;

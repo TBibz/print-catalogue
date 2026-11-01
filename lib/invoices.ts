@@ -109,6 +109,9 @@ export function formatDateTime(iso: string) {
 }
 
 // "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft …" before it has a number).
+// Always said in an invoice email, even if it's removed from the message.
+export const PDF_ATTACHED_LINE = "The invoice is attached as a PDF.";
+
 export function invoiceFileName(invoice: Pick<Invoice, "number" | "status">, companyName: string) {
   const label = invoice.status === "finalised" && invoice.number ? invoice.number : "Draft";
   return `${label} ${companyName}.pdf`.replace(/[\\/:*?"<>|]/g, "");

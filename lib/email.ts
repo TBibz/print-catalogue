@@ -42,6 +42,8 @@ export type OutgoingEmail = {
   to: string;
   subject: string;
   text: string;
+  // Always sent as real attachments (Content-Disposition: attachment), never
+  // shown inline in the message.
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 };
 
@@ -77,7 +79,7 @@ export async function sendEmail(email: OutgoingEmail): Promise<{ ok: true } | { 
       to: email.to,
       subject: email.subject,
       text: email.text,
-      attachments: email.attachments,
+      attachments: email.attachments?.map((a) => ({ ...a, contentDisposition: "attachment" as const })),
     });
     return { ok: true };
   } catch (error) {

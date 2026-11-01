@@ -27,6 +27,7 @@ import {
   formatDateTime,
   formatInvoiceDate,
   invoiceTitle,
+  PDF_ATTACHED_LINE,
   linesTotals,
   type Company,
   type Customer,
@@ -733,7 +734,7 @@ function SendPanel({
   const [customerName, setCustomerName] = useState("");
   const [subject, setSubject] = useState(`Invoice ${invoice.number} from ${company.name}`);
   const [text, setText] = useState(
-    `Hello,\n\nPlease find attached invoice ${invoice.number} from ${company.name}.\n\nThank you,\n${company.name}`,
+    `Hello,\n\nPlease find attached invoice ${invoice.number} from ${company.name}.\n\n${PDF_ATTACHED_LINE}\n\nThank you,\n${company.name}`,
   );
   const [result, setResult] = useState<Message>(null);
   const [pending, startTransition] = useTransition();
