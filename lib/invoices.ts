@@ -108,10 +108,30 @@ export function formatDateTime(iso: string) {
   });
 }
 
-// "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft …" before it has a number).
+// "1 Nov 2026" (UK date), e.g. for "Sent 1 Nov 2026".
+export function formatSentDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Europe/London",
+  });
+}
+
+// Where an invoice is up to, for the status badge and the list filters:
+// a draft, finalised but never emailed, or emailed (sent_at is the latest
+// send, as each send overwrites it).
+export type InvoiceSendState = "draft" | "not_sent" | "sent";
+
+export function invoiceSendState(invoice: Pick<Invoice, "status" | "sent_at">): InvoiceSendState {
+  if (invoice.status === "draft") return "draft";
+  return invoice.sent_at ? "sent" : "not_sent";
+}
+
 // Always said in an invoice email, even if it's removed from the message.
 export const PDF_ATTACHED_LINE = "The invoice is attached as a PDF.";
 
+// "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft …" before it has a number).
 export function invoiceFileName(invoice: Pick<Invoice, "number" | "status">, companyName: string) {
   const label = invoice.status === "finalised" && invoice.number ? invoice.number : "Draft";
   return `${label} ${companyName}.pdf`.replace(/[\\/:*?"<>|]/g, "");

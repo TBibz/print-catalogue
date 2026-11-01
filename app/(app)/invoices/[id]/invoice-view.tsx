@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/invoices";
 import { useImagePreview } from "@/components/image-preview";
 import { InvoiceSheet, plainCell } from "@/components/invoice-sheet";
+import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { MoneyInput } from "@/components/money-input";
 import type { InvoiceModel } from "@/lib/invoice-data";
 import { imageUrl } from "@/lib/images";
@@ -170,13 +171,8 @@ export function InvoiceView({
       {/* ---- Title and buttons ------------------------------------------- */}
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="text-2xl font-semibold">{invoiceTitle(invoice)}</h1>
-        <span
-          className={`rounded-full border px-3 py-1 text-sm ${
-            draft ? "border-amber-300 bg-amber-50 text-amber-900" : "border-green-200 bg-green-50 text-green-800"
-          }`}
-        >
-          {draft ? "Draft: changes save by themselves" : "Finalised"}
-        </span>
+        <InvoiceStatusBadge invoice={invoice} />
+        {draft && <span className="text-sm text-neutral-600">Changes save by themselves.</span>}
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

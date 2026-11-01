@@ -218,6 +218,12 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - `supabase/snippets/reset-test-data.sql`: TRUNCATE (no CASCADE) of the eight test-data tables plus `invoice_counter` back to 0, in one transaction, then a row count per table. TRUNCATE because the invoice and printing guards work row by row and would block a plain DELETE (checked: a plain delete of a printing request is refused)
 - Checked in PGlite with a finalised invoice, a draft, a printing and a completed job, requests, a note, a monthly row and a customer: all cleared, models (price, NEW flag), categories, materials, printers, settings (opening balance) and profiles unchanged, and the next finalised invoice was INV-0001
 
+### Invoice status badges and filters: Done
+- `components/invoice-status-badge.tsx`: "Draft" (grey), "Not sent" (amber), "Sent 1 Nov 2026" (green, latest send in UK time; each send overwrites `sent_at`), 14px semibold. On the invoices list and next to the number on each invoice page (a draft also says "Changes save by themselves.")
+- Invoices list: filter buttons All / Drafts / Not sent / Sent with counts, All by default; the old "Sent" column is now "Sent to" (the address)
+- `invoiceSendState()` and `formatSentDate()` in `lib/invoices.ts`
+- Checked with sample invoices in the browser pane (1440px and phone): badges and dates right, each filter shows the right rows (temporary preview page, not committed)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.

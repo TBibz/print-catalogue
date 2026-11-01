@@ -4,17 +4,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteDraft } from "@/app/actions/invoices";
+import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { STICKY_HEADINGS } from "@/components/sticky-headings";
 import { formatMoney } from "@/lib/money";
-import { formatDateTime, formatInvoiceDate, type InvoiceListRow } from "@/lib/invoices";
+import { formatInvoiceDate, invoiceSendState, type InvoiceListRow, type InvoiceSendState } from "@/lib/invoices";
 
-const COLUMNS = "md:grid-cols-[8rem_9rem_5rem_8rem_9rem_minmax(0,1fr)_10rem]";
+const COLUMNS = "md:grid-cols-[7rem_9rem_5rem_7rem_10.5rem_minmax(0,1fr)_9.5rem]";
+
+// The filter buttons above the list.
+type Filter = "all" | InvoiceSendState;
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "draft", label: "Drafts" },
+  { key: "not_sent", label: "Not sent" },
+  { key: "sent", label: "Sent" },
+];
+const EMPTY: Record<Filter, string> = {
+  all: "",
+  draft: "No drafts.",
+  not_sent: "Every finalised invoice has been sent.",
+  sent: "No invoices have been sent yet.",
+};
 
 export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceListRow[] }) {
   const [invoices, setInvoices] = useState(serverInvoices);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [filter, setFilter] = useState<Filter>("all");
 
   // Next.js keeps this page alive in the background: take fresh rows when
   // the server sends them, and ask for them each time the page is shown
@@ -50,8 +67,29 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
     );
   }
 
+  const counts: Record<Filter, number> = { all: invoices.length, draft: 0, not_sent: 0, sent: 0 };
+  for (const inv of invoices) counts[invoiceSendState(inv)]++;
+  const shown = filter === "all" ? invoices : invoices.filter((inv) => invoiceSendState(inv) === filter);
+
   return (
     <div>
+      <div role="group" aria-label="Show" className="mb-4 flex flex-wrap gap-2">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            aria-pressed={filter === f.key}
+            onClick={() => setFilter(f.key)}
+            className={`rounded-md border px-4 py-2 text-base ${
+              filter === f.key
+                ? "border-neutral-900 bg-neutral-900 font-medium text-white"
+                : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
+            }`}
+          >
+            {f.label} <span className="tabular-nums">({counts[f.key]})</span>
+          </button>
+        ))}
+      </div>
       {message && (
         <p
           role={message.ok ? "status" : "alert"}
@@ -66,11 +104,12 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
         <span className="text-right">Items</span>
         <span className="text-right">Total</span>
         <span>Status</span>
-        <span>Sent</span>
+        <span>Sent to</span>
         <span />
       </div>
+      {shown.length === 0 && <p className="px-3 py-8 text-center text-neutral-600">{EMPTY[filter]}</p>}
       <ul>
-        {invoices.map((inv) => {
+        {shown.map((inv) => {
           const draft = inv.status === "draft";
           return (
             <li
@@ -86,16 +125,10 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
               </span>
               <span className="font-medium tabular-nums md:text-right">{formatMoney(inv.totals.total)}</span>
               <span>
-                <span
-                  className={`inline-block rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap ${
-                    draft ? "border-amber-300 bg-amber-50 text-amber-900" : "border-green-200 bg-green-50 text-green-800"
-                  }`}
-                >
-                  {draft ? (inv.number ? "Reopened draft" : "Draft") : "Finalised"}
-                </span>
+                <InvoiceStatusBadge invoice={inv} />
               </span>
-              <span className="text-neutral-600">
-                {inv.sent_at ? `${formatDateTime(inv.sent_at)}${inv.sent_to ? ` · ${inv.sent_to}` : ""}` : "—"}
+              <span className="min-w-0 truncate text-neutral-600" data-tip={inv.sent_to || undefined}>
+                {inv.sent_at && inv.sent_to ? inv.sent_to : "—"}
               </span>
               <span className="col-span-2 flex justify-end gap-2 md:col-span-1">
                 <Link
