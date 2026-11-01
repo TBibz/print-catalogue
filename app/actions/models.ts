@@ -140,3 +140,56 @@ export async function deleteModel(id: string): Promise<DeleteModelResult> {
   }
   return { ok: true };
 }
+
+// ---- Prices (0018_urgency_prices.sql) ---------------------------------------
+
+type PriceFail = { ok: false; error: string };
+
+function priceError(error: { code?: string; message: string }, what: string): PriceFail {
+  console.error(`${what}:`, error.message);
+  // P0001: a message from the database function, e.g. "Enter a price, e.g. 12.50."
+  if (error.code === "P0001") return { ok: false, error: error.message };
+  return { ok: false, error: "Couldn't save the price. Please check your connection and try again." };
+}
+
+// One model's price, from the Price box on the Models page (autosaves).
+// null clears it ("no price set").
+export async function setModelPrice(
+  id: string,
+  price: number | null,
+): Promise<{ ok: true; price: number | null } | PriceFail> {
+  await requireAdmin();
+  if (price !== null && (!Number.isFinite(price) || price < 0 || price > 100000)) {
+    return { ok: false, error: "Enter a price between £0 and £100,000." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("models")
+    .update({ price: price === null ? null : Math.round(price * 100) / 100 })
+    .eq("id", id)
+    .select("price")
+    .maybeSingle<{ price: number | null }>();
+  if (error) return priceError(error, "models price");
+  if (!data) return { ok: false, error: "This model no longer exists. Refresh the page." };
+  return { ok: true, price: data.price === null ? null : Number(data.price) };
+}
+
+// The same price on several models in one step (set_models_price). With
+// dryRun it changes nothing and just says how many would change.
+export async function setModelsPrice(input: {
+  modelIds: string[];
+  price: number;
+  onlyUnset: boolean;
+  dryRun: boolean;
+}): Promise<{ ok: true; count: number } | PriceFail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_models_price", {
+    p_model_ids: input.modelIds,
+    p_price: input.price,
+    p_only_unset: input.onlyUnset,
+    p_dry_run: input.dryRun,
+  });
+  if (error) return priceError(error, "set_models_price");
+  return { ok: true, count: Number(data) || 0 };
+}

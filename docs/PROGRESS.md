@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-10-31 (sticky headings, auto-hiding nav)_
+_Last updated: 2026-11-01 (two urgency levels, model prices, Phase 9 planned)_
 
 ## Phases
 
@@ -18,6 +18,7 @@ _Last updated: 2026-10-31 (sticky headings, auto-hiding nav)_
 | 6b | Colours, categories page, notepad count | Done (needs `0010` run, then testing) |
 | 7 | Money and stats | Done (needs `0012` run, then testing) |
 | 8 | Future-proofing and polish | Done (needs `0013`–`0015` run, then testing); custom domain still to do |
+| 9 | Invoices | Planned, not started (outline in the brief; model prices are in place) |
 
 ### 1. Foundations: Done
 - Next.js 16 app, Supabase email/password login, sign out, proxy guarding every page except `/login`
@@ -137,6 +138,21 @@ _Last updated: 2026-10-31 (sticky headings, auto-hiding nav)_
 - `0017_request_lines_policies.sql`: request_lines insert / update / delete (already `to authenticated`) now check for a profile with role admin or requester instead of `true`; reading stays `true` (not flagged). Re-revokes the admin RPCs from `public` / `anon` as a safety net
 - Checked in PGlite: Tomi and Dad can still add, change and delete request lines; a login without a profile can't; Dad gets "Only the admin…" from every admin function; function rights identical before and after; safe to run twice
 
+### Urgency levels and model prices: Done (needs `0018` run, then testing)
+- `0018_urgency_prices.sql`:
+  - URGENT removed. Existing URGENT request lines, and the urgency copied onto print job items (used when a line is recreated), become ASAP; the checks on both now allow only ASAP and PRIORITY
+  - `models.price` (numeric(10, 2), £, null = no price set, can't be negative)
+  - `catalogue_models()` dropped and recreated with `price` (its columns changed), still without `admin_notes`, still logged-in users only
+  - `set_models_price(ids, price, only_unset, dry_run)` and `set_category_price(category, price, only_unset, dry_run)`: admin only (raise "Only the admin can change prices." for anyone else), rounded to pence, models already at that price don't count, the dry run returns the count
+- Checked in PGlite (migrations 0001–0017, URGENT test data including a line on a printing job, then 0018 run twice): 24 checks pass. URGENT converted on lines and job items and refused afterwards; the requester can still change urgency on a printing line; catalogue_models() gives the requester `price` but not `admin_notes`; logged-out users can't call the functions; the requester is refused by both bulk functions; dry runs change nothing; only-unset vs overwrite counts are right; prices round to pence
+- App: the urgency dropdown, pill colours and queue sort all come from `lib/requests.ts` (ASAP → PRIORITY → none)
+- `/admin/models`: Price column with an autosaving £ box per model (`price-cell.tsx`; blank clears it). Tick boxes, "Select all N shown" (respects search and filters; changing them clears the ticks) and "Set price for N selected…"
+- `/admin/categories`: "Set price…" next to "Set scale…"
+- Both bulk actions use one panel (`components/bulk-price-panel.tsx`): £ amount, "Only models with no price set" or "All … (overwrites)", and a confirm button showing how many models will change (asked of the database with a dry run as you type)
+- The catalogue doesn't read `price` yet (it lists its columns explicitly)
+- Brief: URGENT removed everywhere, prices documented, Phase 9 (Invoices) outline added
+- Not checked in a browser (Claude can't log in). Lint and the build pass
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -160,6 +176,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0015_bulk_default_scale.sql` | 8 | `set_category_default_scale()` | ☐ |
 | `0016_security_advisor.sql` | 8 | the five requester views become functions, `rls_auto_enable()` locked down, faster policies, categories policies split | ☐ |
 | `0017_request_lines_policies.sql` | 8 | request_lines write policies check for an admin/requester profile instead of `true`; admin RPCs re-revoked from public/anon | ☐ |
+| `0018_urgency_prices.sql` | 8+ | URGENT → ASAP and removed; `models.price`; `catalogue_models()` with price; `set_models_price()`, `set_category_price()` | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -177,8 +194,12 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - Custom domain (Phase 8) not done: it's set up in Vercel and your domain registrar, not in code.
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 - Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
+- The app needs `0018` run: the Models page reads `models.price`, so it shows an error until then.
+- Model prices aren't shown anywhere except the Models page yet (on purpose, until Phase 9).
 
 **Decisions made along the way**
+- Two urgency levels only (ASAP, PRIORITY). URGENT lines were turned into ASAP rather than PRIORITY so nothing became less urgent.
+- Bulk "Set price" ignores models already at that exact price when counting, so the confirm button only counts real changes.
 - Request lines are shared by both accounts (no per-user owner), hence "Show all current requests".
 - Models are edited inline on `/admin/models`; the separate new/edit pages were removed.
 - Materials and printers are retired with an `active` flag instead of being deleted when they are in use.

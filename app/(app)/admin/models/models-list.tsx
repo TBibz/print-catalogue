@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { setModelsPrice } from "@/app/actions/models";
+import { BulkPricePanel } from "@/components/bulk-price-panel";
 import {
   AVAILABILITY_LABELS,
   compareModels,
@@ -12,6 +14,7 @@ import {
   type Category,
 } from "@/lib/catalogue";
 import { ModelEditor, MODEL_COLUMNS } from "./model-editor";
+import { PriceCell } from "./price-cell";
 
 type Filter = "all" | Availability;
 
@@ -50,6 +53,11 @@ export function ModelsList({
   const [editing, setEditing] = useState<Editing>(null);
   const [message, setMessage] = useState<string | null>(null);
   const editorDirty = useRef(false);
+  // Ticked models (for "Set price for N selected").
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [pricePanel, setPricePanel] = useState(false);
+  // Bumped after a bulk price change so every Price box shows the new price.
+  const [priceVersion, setPriceVersion] = useState(0);
 
   // Next.js keeps this page alive in the background between visits. When
   // the server sends fresh models, show those.
@@ -58,6 +66,16 @@ export function ModelsList({
     setSynced(serverModels);
     setModels(serverModels);
     setEditing(null);
+    setSelected(new Set());
+    setPricePanel(false);
+  }
+
+  // Changing the search or filters clears the ticks, so a bulk change only
+  // ever touches models you can see.
+  function changeView(change: () => void) {
+    change();
+    setSelected(new Set());
+    setPricePanel(false);
   }
 
   const sortedCategories = useMemo(
@@ -131,6 +149,40 @@ export function ModelsList({
     setModels((prev) => prev.map((m) => (m.id === modelId ? { ...m, image_path: path } : m)));
   }, []);
 
+  // A price saved in one model's Price box.
+  const handlePriceSaved = useCallback((modelId: string, price: number | null) => {
+    setModels((prev) => prev.map((m) => (m.id === modelId ? { ...m, price } : m)));
+  }, []);
+
+  const priceBox = (m: AdminModel) => (
+    <PriceCell
+      key={`${m.id}@${priceVersion}`}
+      modelId={m.id}
+      code={m.code}
+      price={m.price}
+      onSaved={handlePriceSaved}
+    />
+  );
+
+  // ---- Ticking --------------------------------------------------------
+  const shownIds = visible.map((m) => m.id);
+  const allShownTicked = shownIds.length > 0 && shownIds.every((id) => selected.has(id));
+  const selectedIds = shownIds.filter((id) => selected.has(id));
+
+  function toggle(id: string, on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleAllShown(on: boolean) {
+    setSelected(on ? new Set(shownIds) : new Set());
+    if (!on) setPricePanel(false);
+  }
+
   const editorProps = {
     categories: sortedCategories,
     onSaved: handleSaved,
@@ -150,7 +202,7 @@ export function ModelsList({
           id="models-search"
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => changeView(() => setQuery(e.target.value))}
           placeholder="Search by code, name, category or admin note…"
           className="w-full max-w-md rounded-md border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
         />
@@ -171,7 +223,7 @@ export function ModelsList({
             type="button"
             role="tab"
             aria-selected={filter === f.value}
-            onClick={() => setFilter(f.value)}
+            onClick={() => changeView(() => setFilter(f.value))}
             className={`rounded-full border px-3.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
               filter === f.value
                 ? "border-neutral-900 bg-neutral-900 text-white"
@@ -190,7 +242,7 @@ export function ModelsList({
         <input
           type="checkbox"
           checked={missingImageOnly}
-          onChange={(e) => setMissingImageOnly(e.target.checked)}
+          onChange={(e) => changeView(() => setMissingImageOnly(e.target.checked))}
           className="h-4 w-4 cursor-pointer accent-neutral-900"
         />
         Without an image only ({missingImages})
@@ -202,24 +254,89 @@ export function ModelsList({
         </p>
       )}
 
-      <p className="mb-2 text-sm text-neutral-500" aria-live="polite">
-        {visible.length} {visible.length === 1 ? "model" : "models"}
-      </p>
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <span className="text-neutral-500" aria-live="polite">
+          {visible.length} {visible.length === 1 ? "model" : "models"}
+        </span>
+        <label className="flex cursor-pointer items-center gap-2 select-none">
+          <input
+            type="checkbox"
+            checked={allShownTicked}
+            disabled={shownIds.length === 0}
+            onChange={(e) => toggleAllShown(e.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-neutral-900"
+          />
+          Select all {visible.length} shown
+        </label>
+        {selectedIds.length > 0 && (
+          <>
+            <span className="font-medium">{selectedIds.length} selected</span>
+            <button
+              type="button"
+              onClick={() => setPricePanel((open) => !open)}
+              aria-expanded={pricePanel}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"
+            >
+              Set price for {selectedIds.length} selected…
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleAllShown(false)}
+              className="text-neutral-600 underline hover:no-underline"
+            >
+              Clear selection
+            </button>
+          </>
+        )}
+      </div>
+
+      {pricePanel && selectedIds.length > 0 && (
+        <div className="mb-3">
+          <BulkPricePanel
+            title={`Set the price for ${selectedIds.length} selected ${selectedIds.length === 1 ? "model" : "models"}`}
+            allLabel="All selected models (overwrites)"
+            run={(price, onlyUnset, dryRun) =>
+              setModelsPrice({ modelIds: selectedIds, price, onlyUnset, dryRun })
+            }
+            onApplied={(price, onlyUnset) => {
+              // Show the new prices without reloading the page.
+              setModels((prev) =>
+                prev.map((m) =>
+                  selectedIds.includes(m.id) && (!onlyUnset || m.price === null) ? { ...m, price } : m,
+                ),
+              );
+              setPriceVersion((v) => v + 1);
+            }}
+            onClose={() => setPricePanel(false)}
+          />
+        </div>
+      )}
 
       <div className="border-t border-neutral-200">
         <div
           className={`hidden gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase md:grid ${MODEL_COLUMNS}`}
         >
+          <span>
+            <input
+              type="checkbox"
+              aria-label={`Select all ${visible.length} shown`}
+              checked={allShownTicked}
+              disabled={shownIds.length === 0}
+              onChange={(e) => toggleAllShown(e.target.checked)}
+              className="h-4 w-4 cursor-pointer accent-neutral-900"
+            />
+          </span>
           <span>Code</span>
           <span>Name</span>
           <span>Category</span>
           <span>Sizes</span>
+          <span className="text-right">Price</span>
           <span>Availability</span>
           <span />
         </div>
         <ul>
           {editing === "new" && (
-            <ModelEditor key="new" model={null} requestCount={0} {...editorProps} />
+            <ModelEditor key="new" model={null} requestCount={0} priceBox={null} {...editorProps} />
           )}
           {visible.map((m) =>
             m.id === editing ? (
@@ -227,6 +344,7 @@ export function ModelsList({
                 key={m.id}
                 model={m}
                 requestCount={requestCounts[m.id] ?? 0}
+                priceBox={priceBox(m)}
                 {...editorProps}
               />
             ) : (
@@ -234,7 +352,26 @@ export function ModelsList({
                 key={m.id}
                 className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-neutral-100 px-3 py-3 md:py-2.5 ${MODEL_COLUMNS}`}
               >
-                <span className="font-mono text-sm">{m.code}</span>
+                <span className="hidden md:block">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${m.code}`}
+                    checked={selected.has(m.id)}
+                    onChange={(e) => toggle(m.id, e.target.checked)}
+                    className="h-4 w-4 cursor-pointer accent-neutral-900"
+                  />
+                </span>
+                <span className="flex items-center gap-2 font-mono text-sm">
+                  {/* On phones the tick box sits next to the code. */}
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${m.code}`}
+                    checked={selected.has(m.id)}
+                    onChange={(e) => toggle(m.id, e.target.checked)}
+                    className="h-4 w-4 cursor-pointer accent-neutral-900 md:hidden"
+                  />
+                  {m.code}
+                </span>
                 <span className="col-start-1 min-w-0 md:col-start-auto">
                   <span className="break-words">{m.name}</span>
                   {showNewBadge(m, printTotals[m.id] ?? 0) ? (
@@ -268,6 +405,7 @@ export function ModelsList({
                 <span className="hidden text-sm text-neutral-600 md:block">
                   {[m.default_scale, ...m.other_scales].filter(Boolean).join(", ") || "—"}
                 </span>
+                <span className="col-start-1 w-36 md:col-start-auto md:w-auto">{priceBox(m)}</span>
                 <span className="col-start-1 md:col-start-auto">
                   <span
                     className={`inline-block rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap ${AVAILABILITY_STYLES[m.availability]}`}
@@ -278,7 +416,7 @@ export function ModelsList({
                 <button
                   type="button"
                   onClick={() => openEditor(m.id)}
-                  className="col-start-2 row-span-3 row-start-1 self-center rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 md:col-start-auto md:row-span-1 md:row-start-auto"
+                  className="col-start-2 row-span-4 row-start-1 self-center rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 md:col-start-auto md:row-span-1 md:row-start-auto"
                 >
                   Edit
                 </button>

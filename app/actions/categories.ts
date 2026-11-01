@@ -107,3 +107,28 @@ export async function setCategoryDefaultScale(input: {
   }
   return { ok: true, count: Number(data) || 0 };
 }
+
+// Sets the price on every model in a category in one step (see
+// 0018_urgency_prices.sql). With dryRun it changes nothing and just says how
+// many models would change.
+export async function setCategoryPrice(input: {
+  categoryId: string;
+  price: number;
+  onlyUnset: boolean;
+  dryRun: boolean;
+}): Promise<{ ok: true; count: number } | Fail> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_category_price", {
+    p_category_id: input.categoryId,
+    p_price: input.price,
+    p_only_unset: input.onlyUnset,
+    p_dry_run: input.dryRun,
+  });
+  if (error) {
+    console.error("set_category_price:", error.message);
+    // P0001: a message from the function, e.g. "Enter a price, e.g. 12.50."
+    return { ok: false, error: error.code === "P0001" ? error.message : "Couldn't update the prices. Please try again." };
+  }
+  return { ok: true, count: Number(data) || 0 };
+}

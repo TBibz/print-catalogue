@@ -6,13 +6,15 @@ import {
   reorderCategories,
   saveCategory,
   setCategoryDefaultScale,
+  setCategoryPrice,
   type CategoryInput,
 } from "@/app/actions/categories";
+import { BulkPricePanel } from "@/components/bulk-price-panel";
 import { compareCategories, USUAL_SCALES, type Category } from "@/lib/catalogue";
 import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
 import { ColourPicker } from "@/components/colour-picker";
 
-const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_4rem_8rem_4.5rem_15.5rem]";
+const GRID = "md:grid-cols-[6.5rem_minmax(0,1fr)_4rem_8rem_4.5rem_21.5rem]";
 const box =
   "h-11 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 
@@ -218,6 +220,7 @@ function CategoryRow({
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [scalePanel, setScalePanel] = useState(false);
+  const [pricePanel, setPricePanel] = useState(false);
   // The row can only be dragged by its handle, not from the name box.
   const [handleHeld, setHandleHeld] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -357,13 +360,31 @@ function CategoryRow({
           {category && (
             <button
               type="button"
-              onClick={() => setScalePanel((open) => !open)}
+              onClick={() => {
+                setScalePanel((open) => !open);
+                setPricePanel(false);
+              }}
               aria-expanded={scalePanel}
               disabled={modelCount === 0}
               title={modelCount === 0 ? "This category has no models" : "Set the default scale of its models"}
               className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-30"
             >
               Set scale…
+            </button>
+          )}
+          {category && (
+            <button
+              type="button"
+              onClick={() => {
+                setPricePanel((open) => !open);
+                setScalePanel(false);
+              }}
+              aria-expanded={pricePanel}
+              disabled={modelCount === 0}
+              title={modelCount === 0 ? "This category has no models" : "Set the price of its models"}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-30"
+            >
+              Set price…
             </button>
           )}
           {category ? (
@@ -396,6 +417,17 @@ function CategoryRow({
 
       {scalePanel && category && (
         <ScalePanel category={category} onClose={() => setScalePanel(false)} />
+      )}
+
+      {pricePanel && category && (
+        <BulkPricePanel
+          title={`Set the price for ${category.name}`}
+          allLabel="All models in this category (overwrites)"
+          run={(price, onlyUnset, dryRun) =>
+            setCategoryPrice({ categoryId: category.id, price, onlyUnset, dryRun })
+          }
+          onClose={() => setPricePanel(false)}
+        />
       )}
 
       {confirmingDelete && category && (

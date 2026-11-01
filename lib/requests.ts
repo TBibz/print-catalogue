@@ -2,7 +2,7 @@
 import { naturalCollator } from "@/lib/catalogue";
 
 // Listed in the order they appear in the dropdown (blank first).
-export const URGENCIES = ["PRIORITY", "URGENT", "ASAP"] as const;
+export const URGENCIES = ["PRIORITY", "ASAP"] as const;
 export type Urgency = (typeof URGENCIES)[number];
 
 export function isUrgency(value: unknown): value is Urgency {
@@ -35,19 +35,18 @@ export const REQUEST_LINE_COLUMNS =
 // Pill colours, matching the old sheet (brief section 5).
 export const URGENCY_STYLES: Record<Urgency | "none", string> = {
   ASAP: "bg-red-800 text-white border-red-800",
-  URGENT: "bg-pink-100 text-red-800 border-pink-200",
   PRIORITY: "bg-green-100 text-green-800 border-green-200",
   none: "bg-white text-neutral-500 border-neutral-300",
 };
 
-// Queue order: ASAP → URGENT → PRIORITY → none, then code in natural order.
-const URGENCY_RANK: Record<Urgency, number> = { ASAP: 0, URGENT: 1, PRIORITY: 2 };
+// Queue order: ASAP → PRIORITY → none, then code in natural order.
+const URGENCY_RANK: Record<Urgency, number> = { ASAP: 0, PRIORITY: 1 };
 
 export function compareQueue(
   a: { urgency: Urgency | null; code: string },
   b: { urgency: Urgency | null; code: string },
 ) {
-  const rank = (u: Urgency | null) => (u ? URGENCY_RANK[u] : 3);
+  const rank = (u: Urgency | null) => (u ? URGENCY_RANK[u] : 2);
   return rank(a.urgency) - rank(b.urgency) || naturalCollator.compare(a.code, b.code);
 }
 

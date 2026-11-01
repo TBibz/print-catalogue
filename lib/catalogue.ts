@@ -74,10 +74,11 @@ export const AVAILABILITY_LABELS: Record<Availability, string> = {
 
 // A full row from the models table, as only the admin can read it.
 export type AdminModel = CatalogueModel & {
+  price: number | null; // £, null = no price set
   admin_notes: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export const ADMIN_MODEL_COLUMNS =
-  "id, code, code_key, name, category_id, default_scale, other_scales, availability, image_path, show_new_badge, admin_notes, created_at, updated_at";
+  "id, code, code_key, name, category_id, default_scale, other_scales, availability, image_path, show_new_badge, price, admin_notes, created_at, updated_at";

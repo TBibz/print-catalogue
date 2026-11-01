@@ -22,8 +22,9 @@ import {
 } from "@/lib/catalogue";
 
 // Column widths shared by the list rows and the editor (md screens and up).
+// Tick box, code, name, category, sizes, price, availability, Edit.
 export const MODEL_COLUMNS =
-  "md:grid-cols-[7rem_minmax(0,1fr)_10rem_8rem_8rem_6rem]";
+  "md:grid-cols-[1.5rem_7rem_minmax(0,1fr)_10rem_8rem_8.5rem_8rem_6rem]";
 
 const box =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
@@ -51,6 +52,7 @@ export function ModelEditor({
   onCancel,
   onDirtyChange,
   onImageChanged,
+  priceBox,
 }: {
   model: AdminModel | null; // null = adding a new model
   categories: Category[]; // already sorted by name
@@ -60,6 +62,8 @@ export function ModelEditor({
   onCancel: () => void;
   onDirtyChange: (dirty: boolean) => void;
   onImageChanged: (modelId: string, path: string | null) => void;
+  // The model's autosaving Price box (it saves by itself, not with Save).
+  priceBox: React.ReactNode;
 }) {
   const [original] = useState(() => inputFrom(model));
   const [values, setValues] = useState(original);
@@ -151,6 +155,8 @@ export function ModelEditor({
       >
         {/* ---- Row: the same columns as the list -------------------- */}
         <div className={`grid grid-cols-1 gap-3 md:items-start md:gap-4 ${MODEL_COLUMNS}`}>
+          {/* The tick-box column stays empty while editing. */}
+          <span className="hidden md:block" />
           <div>
             <label htmlFor="edit-code" className={fieldLabel}>
               Code
@@ -218,6 +224,10 @@ export function ModelEditor({
               ))}
             </datalist>
             {fieldError("defaultScale")}
+          </div>
+          <div>
+            <span className={fieldLabel}>Price</span>
+            {priceBox ?? <p className="py-2 text-sm text-neutral-500">Add the model first</p>}
           </div>
           <div>
             <label htmlFor="edit-availability" className={fieldLabel}>

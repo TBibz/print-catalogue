@@ -33,7 +33,7 @@ Only these two users. No public sign-up.
 - `admin` (Tomi): full read/write on everything.
 - `requester` (Dad): read the catalogue (except admin-only fields); create, update and delete request lines; read print status for his requests; write notepad lines and edit/delete his own. Cannot see costs, charges, materials, printers, print job details or admin notes.
 - A `profiles` table links each auth user to a role. Provide an SQL helper `is_admin()` used by RLS policies.
-- Admin-only columns (e.g. `models.admin_notes`) are exposed to the requester only through a `security definer` function that returns the safe columns (`catalogue_models()` for models without `admin_notes`). No `security definer` views (Supabase's Security Advisor flags them). Such functions use `set search_path = ''`, are revoked from `public` and `anon`, and granted to `authenticated`.
+- Admin-only columns (e.g. `models.admin_notes`) are exposed to the requester only through a `security definer` function that returns the safe columns (`catalogue_models()` for models without `admin_notes`, including `price`). No `security definer` views (Supabase's Security Advisor flags them). Such functions use `set search_path = ''`, are revoked from `public` and `anon`, and granted to `authenticated`.
 - RLS policies wrap `auth.uid()` and `is_admin()` in `(select …)` so they run once per query, and each table has at most one permissive policy per action.
 - Admin-only `security definer` functions raise an error first thing unless `is_admin()` is true, and can't be run by `public` or `anon`. Policies avoid a bare `true` for writes: request lines can be changed by anyone with an admin or requester profile.
 
@@ -59,6 +59,8 @@ Build tables only when their phase is reached. Names and fields below are the ta
   - hidden = retired; not shown in the catalogue, kept for history
 - `image_path` (nullable; some models have no image). Images are shrunk in the browser to 1000px on white (WebP, JPEG fallback) before upload.
 - `show_new_badge` (bool). The NEW badge shows when this is true AND the model's successful printed total is < 4.
+- `price` (numeric(10, 2), £, nullable: null = no price set). Edited by the admin on the Models page, one at a time or in bulk; not shown anywhere else yet. Included in `catalogue_models()` so both roles can read it (for the Phase 9 invoice builder).
+- `set_models_price(models, price, only_unset, dry_run)` and `set_category_price(category, price, only_unset, dry_run)` (admin only): set one price on many models in one step (only those with no price, or all, overwriting); the dry run returns how many would change.
 - `admin_notes` (admin-only), `created_at`, `updated_at`
 - `code_key` (generated: lower(code) with spaces removed), used to match image file names
 
@@ -67,7 +69,7 @@ Build tables only when their phase is reached. Names and fields below are the ta
 ### request_lines (Phase 2)
 One row per model + option combination that Dad currently wants.
 - `id`, `model_id`, `scale` (nullable text; null = model default), `colour_material_id` (nullable, FK materials; null = "Any colour"; only for models whose category has colour options)
-- `quantity` (int > 0: outstanding amount still wanted), `urgency` (nullable: `ASAP` | `URGENT` | `PRIORITY`), `note` (text)
+- `quantity` (int > 0: outstanding amount still wanted), `urgency` (nullable: `ASAP` | `PRIORITY`), `note` (text)
 - `created_at`, `updated_at`
 - Unique on (model_id, scale, colour_material_id), treating nulls as equal.
 - A colour must be a filament that is offered as a colour, in stock and in use when it is chosen (database trigger `request_lines_colour_check`). A line keeps its colour if it later goes out of stock, and lines recreated by edit/revert/delete keep theirs too.
@@ -131,11 +133,10 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 **Sorting**
 - Catalogue: category position (the order on the Categories page), then code in natural order (use `Intl.Collator('en', { numeric: true, sensitivity: 'base' })`).
-- Print queue: urgency (ASAP → URGENT → PRIORITY → none), then code in natural order.
+- Print queue: urgency (ASAP → PRIORITY → none), then code in natural order.
 
 **Urgency colours** (match the old sheet)
 - ASAP: dark red pill, white text
-- URGENT: light pink pill, dark red text
 - PRIORITY: light green pill, dark green text
 - none: blank
 
@@ -184,9 +185,9 @@ Admin only:
 - `/admin/queue`: all request lines sorted by the queue rule, with "N requested · M printing". Tick lines, set how many go on this plate (default = what's left to print), add catalogue models (search) or free-text items, choose printer, see my cost and charge live, "Start print". Colour items show their colour stripe and name; on a filament printer, if every coloured item on the plate is the same colour, that filament is pre-selected (still changeable). Shows "N unticked notepad notes" at the top, linking to /notepad.
 - `/admin/jobs` ("Jobs" in the header): "Printing now" (Complete with succeeded per item, or "All succeeded" / "All failed", which apply straight away; Edit details, Cancel), and "History" of completed and cancelled jobs, newest first (latest 200, with "Showing latest 200 of N" when there are more), with date, printer, items, succeeded/planned, my cost and charge. Open a history row to edit details, edit the result or revert. Any job (printing, completed or cancelled) can be deleted for good, after an in-page confirmation.
 - `/admin/models` also shows each model's printed total.
-- `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it.
+- `/admin/models`: one searchable list; Edit opens the row inline (code, name, category, default size, availability) with a panel below for extra sizes, admin notes, NEW badge, image (upload/replace/remove) and delete. "+ Add model" opens a blank row. Delete warns how many open requests go with it; print history (Phase 6) will block it. Each row has a Price column: a £ box that autosaves on its own ("Saved ✓"; blank = no price). Tick boxes on every row, "Select all N shown" (only the models the current search and filters show; changing them clears the ticks) and "Set price for N selected…", which opens the same panel as on Categories ("All selected models (overwrites)").
 - `/admin/upload`: bulk image upload; match file name to `code_key`, create new models for unknown codes (choose a category for the batch), ask before replacing an existing image.
-- `/admin/categories`: each category with its model count; drag-and-drop order (⠿ handle, plus ↑ ↓ buttons), saved immediately; rename, colour (picker), colour options, add; delete only when it has no models; "Set scale…" opens an in-page panel to set the default scale in bulk (shows how many models will change before confirming).
+- `/admin/categories`: each category with its model count; drag-and-drop order (⠿ handle, plus ↑ ↓ buttons), saved immediately; rename, colour (picker), colour options, add; delete only when it has no models; "Set scale…" opens an in-page panel to set the default scale in bulk (shows how many models will change before confirming). "Set price…" works the same way: a £ amount, "Only models with no price set" or "All models in this category (overwrites)", and a confirm button saying how many models will change.
 - `/admin/materials`: each material shows its colour stripe; adding or editing uses a native colour picker for `colour_hex`.
 - `/admin/materials`, `/admin/printers` (each printer has a colour picker)
 - `/admin/money` ("Money" in the header): the running total at the top, large, red if negative, green if positive, grey at zero. A "Starting balance" section (opening balance and first month shown, saved to settings). A table, newest month first: Month ("Oct 2026"), Print jobs ("12 plates · 47 items"), Charge, Payments, Costs, Difference. Payments and Costs are £ boxes that autosave ("Saved ✓"), with "Materials from jobs: £x.xx" in grey under Costs. Difference is coloured like the total. Below: all-time stats (plates and items per printer, total charge, top 10 most printed models).
@@ -204,6 +205,17 @@ Admin only:
    - **6b:** colour choice for categories with colour options such as BASES (`colour_material_id` on request lines and job items), `/admin/categories` page, unticked notepad count on the queue.
 7. **Money and stats:** monthly payments and costs, charges from completed jobs, difference and running total with an opening balance, print stats.
 8. **Future-proofing and polish:** no silent row limits, compact rows, alternating and gold NEW rows, "Not ready", category and printer colours, one-click job results, bulk default scale, installable home-screen app. (Custom domain still to do.)
+9. **Invoices** (planned, not started): see below.
+
+### Phase 9: Invoices (planned, not started)
+Outline only, so it isn't forgotten. Model prices (`models.price`, `0018_urgency_prices.sql`) are already in place for it.
+- **Invoice builder page**, available to both roles: a copy of the catalogue with a tick box, category, name, price and quantity per model, plus a "Generate invoice" button.
+- **Invoices tab** listing draft and finalised invoices.
+- **A4 invoice layout:** company name and contact details; item lines with code, name, qty, price each and line total; grand total at the top.
+- **Editing drafts:** add or remove models, change quantities, add free-text lines.
+- **Finalise** an invoice (after which it no longer changes).
+- **Download as PDF.**
+- **Sending options:** to be decided.
 
 ## 8. Catalogue import (Phase 1)
 
