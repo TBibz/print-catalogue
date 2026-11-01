@@ -18,7 +18,7 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 | 6b | Colours, categories page, notepad count | Done (needs `0010` run, then testing) |
 | 7 | Money and stats | Done (needs `0012` run, then testing) |
 | 8 | Future-proofing and polish | Done (needs `0013`–`0015` run, then testing); custom domain still to do |
-| 9 | Invoices | Done (needs `0019` run, Gmail env vars, then testing) |
+| 9 | Invoices | Done (needs `0019` run, the SMTP env vars, then testing) |
 
 ### 1. Foundations: Done
 - Next.js 16 app, Supabase email/password login, sign out, proxy guarding every page except `/login`
@@ -173,13 +173,17 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - `/invoices/new`: builder in the catalogue's style (sidebar with database counts, search, purple sticky headings, lavender rows; ticked rows light green); typing a quantity ticks, unticking clears; "Show ticked only"; sticky bottom bar "N items · £total" (+ how many have no price) and Generate invoice
 - `/invoices/[id]`: the invoice sheet (`components/invoice-sheet.tsx`) built from the same measurements as the PDF (`lib/invoice-layout.ts`). Drafts: quantity, price (amber outline when missing) and free-text description boxes that autosave, × to remove, "+ Add model" (search) and "+ Add free-text line", date box, Finalise (waits for any save still in progress; disabled until every line has a price), Download PDF, Delete draft. Finalised: Send…, Download PDF, Reopen (not if sent), Duplicate as new draft
 - PDF (`lib/invoice-pdf-document.tsx`, `lib/invoice-pdf.tsx`, route `/invoices/[id]/pdf`): `@react-pdf/renderer`, A4, table header repeated on every page, "Page X of Y", DRAFT watermark on drafts, no hyphenation. File name "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft …" for drafts). Checked by rendering a 6-line draft and a 70-line invoice through the dev server: 1 and 3 pages, header repeated, totals right
-- Email (`lib/email.ts`, the only module that sends mail): Nodemailer over Gmail SMTP with `GMAIL_USER` / `GMAIL_APP_PASSWORD`; from name and reply-to come from the company settings; PDF attached. Send panel: To (from the invoice's or default customer), "Save as a customer", subject, message; records sent_at / sent_to; "Sent before on…". Without the env vars the button says "Email not set up yet". Not tested with a real Gmail account (needs the app password)
+- Email (`lib/email.ts`, the only module that sends mail): Nodemailer over any SMTP server (originally Gmail; switched to generic SMTP, see below); from name and reply-to come from the company settings; PDF attached. Send panel: To (from the invoice's or default customer), "Save as a customer", subject, message; records sent_at / sent_to; "Sent before on…". Without the env vars the button says "Email not set up yet". Not yet tested with a real mail server
 - Settings page: company name, three address lines, phone and email
 - Header: the Notepad and Invoices links are now inside `<Suspense>` (plain links as the fallback) because pages with an id in the address (`/invoices/[id]`) can't know the address at build time
 - Catalogue's `CategoryButton` and `CategoryTag` moved to `components/category-nav.tsx` (shared with the builder); the catalogue looks the same
 - Screens checked in the browser pane at 1280px with made-up data (temporary preview page, not committed): builder ticking/unticking and bar, draft sheet with boxes, finalised view with the Send panel, list. Not checked against the real database (Claude can't log in)
 
-## Migrations
+### Invoice email through any SMTP server: Done (needs the SMTP env vars, then testing)
+- `lib/email.ts` now uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` instead of the Gmail ones. Port 465 = SSL/TLS from the start; other ports (587) must use STARTTLS or nothing is sent. From name = company name, reply-to = company email, no BCC. 15-second connection timeouts so a dead server doesn't hang the page
+- Plain-English errors for a refused password, unreachable or unknown server, failed secure connection, refused from-address and refused recipient; the technical message goes to the server log. Checked against fake mail servers on this computer (every message above came out as expected); not yet tried with a real provider
+- Settings → "Email" box (admin only): shows the server, port and from-address in use, or which settings are missing, and "Send test email" sends a plain message to a typed address (`app/actions/email.ts`)
+- `.env.local.example` updated
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
 
@@ -222,8 +226,8 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 - Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
 - The app needs `0018` run: the Models page reads `models.price`, so it shows an error until then.
-- Invoices need `0019` run; sending needs `GMAIL_USER` and `GMAIL_APP_PASSWORD` (locally in `.env.local`, and in Vercel).
-- Invoice emails go out from the Gmail address itself (Gmail doesn't allow another "from" address); the name shown is the company name and replies go to the company email.
+- Invoices need `0019` run; sending needs `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM_EMAIL` (locally in `.env.local`, and in Vercel). The old `GMAIL_USER` / `GMAIL_APP_PASSWORD` are no longer used and can be deleted.
+- Invoice emails go out from `SMTP_FROM_EMAIL` (most servers only allow the login's own address); the name shown is the company name and replies go to the company email. No BCC: every invoice is stored on the site.
 - On a phone the invoice sheet is wider than the screen and scrolls sideways (it's an A4 page).
 - Lines can't be reordered on a draft (they keep the order they were added in).
 

@@ -653,7 +653,7 @@ function FinalisedActions({
         onClick={() => setSendOpen((o) => !o)}
         disabled={!emailReady}
         aria-expanded={sendOpen}
-        title={emailReady ? undefined : "Add GMAIL_USER and GMAIL_APP_PASSWORD to turn on sending"}
+        title={emailReady ? undefined : "Add the SMTP_ settings (see Settings → Email) to turn on sending"}
         className={primary}
       >
         {emailReady ? "Send…" : "Email not set up yet"}

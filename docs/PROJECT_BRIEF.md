@@ -206,7 +206,7 @@ Admin only:
    - **6b:** colour choice for categories with colour options such as BASES (`colour_material_id` on request lines and job items), `/admin/categories` page, unticked notepad count on the queue.
 7. **Money and stats:** monthly payments and costs, charges from completed jobs, difference and running total with an opening balance, print stats.
 8. **Future-proofing and polish:** no silent row limits, compact rows, alternating and gold NEW rows, "Not ready", category and printer colours, one-click job results, bulk default scale, installable home-screen app. (Custom domain still to do.)
-9. **Invoices:** invoice builder from the catalogue, drafts, finalising with INV numbers, A4 PDF, sending by Gmail, customers. See below.
+9. **Invoices:** invoice builder from the catalogue, drafts, finalising with INV numbers, A4 PDF, sending by email (any SMTP server), customers. See below.
 
 ### Phase 9: Invoices
 **Who:** both roles (admin and requester) can use everything in this phase. Dad will use it most, so every step is as simple as possible with clear buttons. Invoices, their lines and customers are shared by both accounts (like request lines).
@@ -235,10 +235,12 @@ Admin only:
 - No VAT, no payment details, no "Bill to" (the layout has a place ready for one later).
 - PDFs are made on the server with `@react-pdf/renderer` (no headless browser, works on Vercel). File name: "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft Alexanders Toy Soldiers.pdf" for drafts).
 
-**Sending by email** (Gmail SMTP, `lib/email.ts`, the only place that sends mail, so it can be switched to Resend later):
-- Nodemailer with `GMAIL_USER` and `GMAIL_APP_PASSWORD` (server-side env vars only). From name "Alexanders Toy Soldiers", reply-to nik@ats-uk.net, PDF attached.
+**Sending by email** (any SMTP mail server, `lib/email.ts`, the only place that sends mail, so it can be switched to Resend later):
+- Nodemailer with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM_EMAIL` (server-side env vars only). Port 465 uses a secure connection from the start (SSL/TLS); any other port (587) must switch to secure with STARTTLS or nothing is sent. Sent from `SMTP_FROM_EMAIL` with the name "Alexanders Toy Soldiers" (company name setting), reply-to nik@ats-uk.net (company email setting), PDF attached, no BCC (every invoice is kept on the site).
+- Server problems are shown in plain English: "The email server refused the password…", "Couldn't connect to the email server…", "Couldn't find the email server…", "Couldn't make a secure connection…", "The email server won't send from SMTP_FROM_EMAIL…", "That email address wasn't accepted…". The technical message goes to the server log.
+- Settings has an admin-only "Email" box: which server and from-address are in use (or which settings are missing) and "Send test email" to any typed address (a plain message, no invoice).
 - "Send" opens an in-page panel: To (pre-filled from the default customer, editable, with a "Save as a customer" tick), subject ("Invoice INV-0001 from Alexanders Toy Soldiers") and a short friendly message, all editable. Sending records `sent_at` and `sent_to` and shows a clear success or error. Sending again is allowed, with a "Sent before on…" notice.
-- Without the env vars the Send button says "Email not set up yet"; Download PDF still works.
+- Without the env vars (any of the five) the Send button says "Email not set up yet"; Download PDF still works.
 
 ## 8. Catalogue import (Phase 1)
 

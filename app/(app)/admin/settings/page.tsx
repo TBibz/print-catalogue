@@ -3,7 +3,9 @@ import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/data";
+import { emailServerSummary } from "@/lib/email";
 import { SettingsForm } from "./settings-form";
+import { TestEmail } from "./test-email";
 
 export const metadata: Metadata = { title: "Settings · Print Catalogue" };
 
@@ -32,5 +34,10 @@ async function SettingsData() {
       </p>
     );
   }
-  return <SettingsForm values={Object.fromEntries(settings.map((s) => [s.key, s.value]))} />;
+  return (
+    <>
+      <SettingsForm values={Object.fromEntries(settings.map((s) => [s.key, s.value]))} />
+      <TestEmail server={emailServerSummary()} />
+    </>
+  );
 }
