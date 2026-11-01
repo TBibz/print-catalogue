@@ -203,6 +203,12 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - `loadInvoiceModels()` now includes `image_path`; draft lines look up their model's image from that list (a line whose model has since been retired shows no preview)
 - Checked with sample data in the browser pane at 1440px: preview below the hovered row and clear of it, flips above near the bottom, caption shown, no tooltip at the same time, hides on a key press and on scroll; rows without an image show only the tooltip (temporary preview page, not committed; pictures themselves not checked as the sample had no real images)
 
+### Email pages run in London: Done (confirm in Vercel)
+- The live site got "refused the password" from the mail server that works from a UK Mac, most likely because the host blocks logins from outside the UK (Vercel runs functions in Washington, D.C. (`iad1`) by default)
+- `vercel.json`: the functions for `app/(app)/invoices/[id]/page.tsx` (Send, a server action that runs as part of that page) and `app/(app)/admin/settings/page.tsx` (Send test email) run in London (`lhr1`). Written as glob patterns (`app/**/invoices/?id?/page.tsx`, because `[id]` means something else in a glob); checked that they match exactly those two files. Nothing else changes region
+- Not used: Next.js `preferredRegion`, which Next.js 16 marks as deprecated and which on Vercel only accepts auto / global / home
+- Hobby plans allow a single function region. If Vercel refuses the deploy because of the region count, the alternative is Settings → Functions → Function Regions → London for the whole project (then delete `vercel.json`)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.

@@ -16,7 +16,7 @@ Only these two users. No public sign-up.
 
 - Next.js 16 (App Router, TypeScript, Cache Components on), Tailwind CSS
 - Supabase: Postgres, Auth (email + password), Storage (model images, public `model-images` bucket with random file paths; only the admin can write)
-- Hosted on Vercel, deployed from GitHub
+- Hosted on Vercel, deployed from GitHub. `vercel.json` runs the two pages that send email (`/invoices/[id]` for Send, `/admin/settings` for Send test email) in London (`lhr1`), because the mail server refuses logins from outside the UK; everything else uses the project's default region
 - Use `@supabase/ssr` for auth in server components, server actions and the proxy (`proxy.ts`, Next.js 16's name for middleware). The proxy requires a session on every page except `/login`.
 - All tables have Row Level Security (RLS) enabled
 - Database changes go in numbered SQL files in `supabase/migrations/` (e.g. `0001_init.sql`). Tomi runs them by hand in the Supabase SQL Editor, so each file must be safe to read and run top to bottom.

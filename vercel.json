@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app/**/invoices/?id?/page.tsx": {
+      "regions": ["lhr1"]
+    },
+    "app/**/admin/settings/page.tsx": {
+      "regions": ["lhr1"]
+    }
+  }
+}
