@@ -12,9 +12,9 @@ import {
 import { imageUrl } from "@/lib/images";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
-import { ANY_COLOUR, colourName, isLightColour, textColourOn, type ColourOption } from "@/lib/colours";
-import { ColourStripe } from "@/components/colour-label";
+import { ANY_COLOUR, colourName, type ColourOption } from "@/lib/colours";
 import { STICKY_HEADINGS } from "@/components/sticky-headings";
+import { CategoryButton, CategoryTag } from "@/components/category-nav";
 import type { CategoryCounts } from "@/lib/data";
 import {
   AddLineButton,
@@ -427,46 +427,6 @@ export function CatalogueView({
   );
 }
 
-// A category in the sidebar. Selected: filled with the category's colour,
-// with dark or white text (whichever reads better on it). Unselected: a
-// small stripe of its colour. "All" has no colour and goes black.
-function CategoryButton({
-  label,
-  count,
-  selected,
-  colour,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  selected: boolean;
-  colour?: string; // "#rrggbb"; none for "All"
-  onClick: () => void;
-}) {
-  const filled = selected && colour ? { backgroundColor: colour, color: textColourOn(colour) } : undefined;
-  return (
-    <button
-      type="button"
-      aria-current={selected ? "true" : undefined}
-      onClick={onClick}
-      style={filled}
-      className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors ${
-        selected
-          ? colour
-            ? `font-medium ${isLightColour(colour) ? "ring-1 ring-neutral-300 ring-inset" : ""}`
-            : "bg-neutral-900 text-white"
-          : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
-      }`}
-    >
-      <span className="flex min-w-0 items-center gap-2">
-        {colour && !selected && <ColourStripe hex={colour} />}
-        <span className="min-w-0 break-words">{label}</span>
-      </span>
-      <span className={`tabular-nums ${selected ? "opacity-70" : "text-neutral-400"}`}>{count}</span>
-    </button>
-  );
-}
-
 type SlotCallbacks = {
   onSaved: (modelId: string, key: string, line: RequestLine) => void;
   onRemoved: (modelId: string, key: string) => void;
@@ -718,16 +678,6 @@ function ModelInfo({
         </span>
       )}
     </div>
-  );
-}
-
-// A small category tag: its colour stripe and name.
-function CategoryTag({ name, colour }: { name: string; colour: string }) {
-  return (
-    <span className="inline-flex max-w-[8rem] min-w-0 shrink-0 items-center gap-1 text-xs text-neutral-600" title={name}>
-      <ColourStripe hex={colour} />
-      <span className="truncate">{name}</span>
-    </span>
   );
 }
 

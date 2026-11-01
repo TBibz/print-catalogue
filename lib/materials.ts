@@ -53,12 +53,58 @@ export const DEFAULT_CHARGE_MULTIPLIER = 2;
 
 
 // The settings the app knows about, with how to show them.
+// kind "number" settings are short number boxes; "text" ones are wide.
+// The company_ ones are printed at the top of every invoice (0019) and can
+// be read by both roles.
 export const SETTINGS = [
   {
     key: "resin_charge_divisor",
     label: "Resin charge divisor",
     help: "A resin print is charged at its estimated weight in grams divided by this number.",
     defaultValue: "15",
+    kind: "number",
+  },
+  {
+    key: "company_name",
+    label: "Company name (on invoices)",
+    help: "Large and bold at the top left of every invoice.",
+    defaultValue: "Alexanders Toy Soldiers",
+    kind: "text",
+  },
+  {
+    key: "company_address_1",
+    label: "Address line 1",
+    help: "Top right of every invoice.",
+    defaultValue: "14 Constance Road",
+    kind: "text",
+  },
+  {
+    key: "company_address_2",
+    label: "Address line 2",
+    help: "Leave blank to skip this line.",
+    defaultValue: "Twickenham",
+    kind: "text",
+  },
+  {
+    key: "company_address_3",
+    label: "Address line 3",
+    help: "Leave blank to skip this line.",
+    defaultValue: "TW2 7HY",
+    kind: "text",
+  },
+  {
+    key: "company_phone",
+    label: "Phone",
+    help: "Shown as “Tel: …” on invoices.",
+    defaultValue: "020-8894-5925",
+    kind: "text",
+  },
+  {
+    key: "company_email",
+    label: "Email",
+    help: "Shown on invoices, and replies to invoice emails go here.",
+    defaultValue: "nik@ats-uk.net",
+    kind: "text",
   },
 ] as const;
 

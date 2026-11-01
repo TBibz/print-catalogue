@@ -5,7 +5,7 @@ import { AdminNav, NavLink } from "@/components/admin-menu";
 import { AutoHideHeader } from "@/components/auto-hide-header";
 import { getCurrentProfile } from "@/lib/auth";
 
-// App name (goes to the catalogue), Notepad, the admin links (admin only),
+// App name (goes to the catalogue), Notepad, Invoices, the admin links (admin only),
 // and Sign out on the right. It hides while scrolling down and comes back on
 // scrolling up (see AutoHideHeader).
 export function SiteHeader() {
@@ -16,7 +16,14 @@ export function SiteHeader() {
           Print Catalogue
         </Link>
         <nav className="flex flex-1 flex-wrap items-center gap-x-1 gap-y-1 text-sm">
-          <NavLink href="/notepad">Notepad</NavLink>
+          {/* The links highlight the current page, which needs the address.
+              On pages whose address has an id in it (e.g. /invoices/[id])
+              that's only known at request time, so it streams in; plain
+              links show until then. */}
+          <Suspense fallback={<PlainLinks />}>
+            <NavLink href="/notepad">Notepad</NavLink>
+            <NavLink href="/invoices">Invoices</NavLink>
+          </Suspense>
           {/* Checking the role needs the login cookie, so it streams in. */}
           <Suspense fallback={null}>
             <AdminLinks />
@@ -40,4 +47,19 @@ async function AdminLinks() {
   const profile = await getCurrentProfile();
   if (profile?.role !== "admin") return null;
   return <AdminNav />;
+}
+
+const plainLink = "rounded-md px-2.5 py-1.5 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900";
+
+function PlainLinks() {
+  return (
+    <>
+      <Link href="/notepad" className={plainLink}>
+        Notepad
+      </Link>
+      <Link href="/invoices" className={plainLink}>
+        Invoices
+      </Link>
+    </>
+  );
 }

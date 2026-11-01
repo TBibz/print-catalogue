@@ -59,7 +59,7 @@ Build tables only when their phase is reached. Names and fields below are the ta
   - hidden = retired; not shown in the catalogue, kept for history
 - `image_path` (nullable; some models have no image). Images are shrunk in the browser to 1000px on white (WebP, JPEG fallback) before upload.
 - `show_new_badge` (bool). The NEW badge shows when this is true AND the model's successful printed total is < 4.
-- `price` (numeric(10, 2), £, nullable: null = no price set). Edited by the admin on the Models page, one at a time or in bulk; not shown anywhere else yet. Included in `catalogue_models()` so both roles can read it (for the Phase 9 invoice builder).
+- `price` (numeric(10, 2), £, nullable: null = no price set). Edited by the admin on the Models page, one at a time or in bulk. Included in `catalogue_models()` so both roles can read it; shown in the invoice builder (Phase 9) and copied onto invoice lines.
 - `set_models_price(models, price, only_unset, dry_run)` and `set_category_price(category, price, only_unset, dry_run)` (admin only): set one price on many models in one step (only those with no price, or all, overwriting); the dry run returns how many would change.
 - `admin_notes` (admin-only), `created_at`, `updated_at`
 - `code_key` (generated: lower(code) with spaces removed), used to match image file names
@@ -170,13 +170,14 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 ## 6. Pages
 
-Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 96rem wide. The header stays at the top but slides away while scrolling down and comes back on any scroll up; the catalogue and queue column headings (dark purple, bold white) stick under it, and the catalogue's category sidebar stays in view with its own scroll.
+Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", "Invoices", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 96rem wide. The header stays at the top but slides away while scrolling down and comes back on any scroll up; the catalogue and queue column headings (dark purple, bold white) stick under it, and the catalogue's category sidebar stays in view with its own scroll.
 
 **Colours are shown one way everywhere** (`components/colour-label.tsx`): a solid 6px vertical stripe of the material's `colour_hex`, full text height with slightly rounded corners, immediately left of the colour name in normal dark text. Very light colours (worked out from the hex's luminance) get a thin grey outline. "Any colour" has no stripe. In the catalogue's colour dropdown the chosen colour's stripe sits inside the box, left of the name.
 
 Request controls (quantity, urgency, note, size, colour, plate) are all 30px high with 14px text, for spreadsheet density. Catalogue list and queue rows are one line where possible, vertically centred, with about 4px padding, and alternate white / soft lavender grey (#f3f1f8). Long names are cut short with "…" (full name on hover). Another size or colour is added with a small "+" right of the size or colour dropdown (tooltip "Add another size/colour").
 
 Everyone:
+- `/invoices`, `/invoices/new`, `/invoices/[id]` and `/invoices/[id]/pdf`: see Phase 9 below.
 - `/login`
 - `/catalogue`: categories in a left-hand sidebar (All + each category, with model counts from the database; on "All" each row shows a small category tag (colour stripe + name) in its own column, and no category is shown inside a category; the selected category is filled with its colour, text dark or white for contrast, "All" black; unselected ones show a stripe of their colour; a category dropdown above the list below 1024px wide), global search across code/name/category/note, list view (default) and grid view toggle (remembered per browser), hover preview of the image in list view (follows the pointer), click the code/name (list) or image (grid) to open a large pop-out, "Show all current requests" toggle (request lines are shared by both accounts, so it shows every requested model, whoever asked). Search also matches request notes. Models in a category with colour options get a colour dropdown ("Any colour" plus every filament offered as a colour; out-of-stock ones are greyed out, marked "(out of stock)" in the open list and can't be chosen, but a line already using one keeps showing it, in grey italics in the closed box with the tooltip "Out of stock"; the Colour column is sized from the longest colour name, so the Note box is always the widest control) and "+ another colour" for another line in a different colour. Size and colour are locked while some are printing. Rows show code, name, scale, availability, NEW badge, and (Phase 2) quantity, urgency and note controls that autosave with a small "Saved ✓", plus "N requested · M printing". From 1280px wide each list row is on one line (Note is the widest control; "Saved ✓" shows inside the Note box, other messages on a line underneath); narrower, the controls sit under the name.
 - `/notepad`: handwritten-style font sitting straight on the plain white page (no card, paper or ruled lines), bullet per line, Enter makes a new line. Admin sees a tick box per line; ticked lines are struck through.
@@ -191,7 +192,7 @@ Admin only:
 - `/admin/materials`: each material shows its colour stripe; adding or editing uses a native colour picker for `colour_hex`.
 - `/admin/materials`, `/admin/printers` (each printer has a colour picker)
 - `/admin/money` ("Money" in the header): the running total at the top, large, red if negative, green if positive, grey at zero. A "Starting balance" section (opening balance and first month shown, saved to settings). A table, newest month first: Month ("Oct 2026"), Print jobs ("12 plates · 47 items"), Charge, Payments, Costs, Difference. Payments and Costs are £ boxes that autosave ("Saved ✓"), with "Materials from jobs: £x.xx" in grey under Costs. Difference is coloured like the total. Below: all-time stats (plates and items per printer, total charge, top 10 most printed models).
-- `/admin/settings`
+- `/admin/settings`: the resin charge divisor and the company details printed on invoices (`company_` settings).
 
 ## 7. Phases
 
@@ -205,17 +206,39 @@ Admin only:
    - **6b:** colour choice for categories with colour options such as BASES (`colour_material_id` on request lines and job items), `/admin/categories` page, unticked notepad count on the queue.
 7. **Money and stats:** monthly payments and costs, charges from completed jobs, difference and running total with an opening balance, print stats.
 8. **Future-proofing and polish:** no silent row limits, compact rows, alternating and gold NEW rows, "Not ready", category and printer colours, one-click job results, bulk default scale, installable home-screen app. (Custom domain still to do.)
-9. **Invoices** (planned, not started): see below.
+9. **Invoices:** invoice builder from the catalogue, drafts, finalising with INV numbers, A4 PDF, sending by Gmail, customers. See below.
 
-### Phase 9: Invoices (planned, not started)
-Outline only, so it isn't forgotten. Model prices (`models.price`, `0018_urgency_prices.sql`) are already in place for it.
-- **Invoice builder page**, available to both roles: a copy of the catalogue with a tick box, category, name, price and quantity per model, plus a "Generate invoice" button.
-- **Invoices tab** listing draft and finalised invoices.
-- **A4 invoice layout:** company name and contact details; item lines with code, name, qty, price each and line total; grand total at the top.
-- **Editing drafts:** add or remove models, change quantities, add free-text lines.
-- **Finalise** an invoice (after which it no longer changes).
-- **Download as PDF.**
-- **Sending options:** to be decided.
+### Phase 9: Invoices
+**Who:** both roles (admin and requester) can use everything in this phase. Dad will use it most, so every step is as simple as possible with clear buttons. Invoices, their lines and customers are shared by both accounts (like request lines).
+
+**Database** (`0019_invoices.sql`; RLS; logged-in users with an admin or requester profile only; explicit grants; nothing for anon/public):
+- `customers`: `name`, `email`, `is_default` (at most one default; `set_default_customer()` switches it in one step).
+- `invoices`: `number` (text, null until finalised, unique), `status` (`draft` | `finalised`), `invoice_date` (default today, Europe/London), `customer_id` (nullable), `created_by`, `finalised_at`, `sent_at`, `sent_to`, `created_at`, `updated_at`. The app may only set `invoice_date` and `customer_id` itself (column grants); number, status and sending are changed only by the functions below.
+- `invoice_lines`: `invoice_id`, `position`, `model_id` (nullable), `code`, `description`, `quantity` (int > 0), `unit_price` (£, null = no price yet), `line_total` (generated: quantity × unit_price). Code, description and unit_price are copied onto the line when it is added, so later catalogue changes never alter an existing invoice. Free-text lines have no model_id or code. Changing a line's price changes that invoice only, never the model's saved price.
+- `invoice_totals` view (security invoker): items, lines, grand total and lines without a price, per invoice.
+- **Numbering:** INV-0001, INV-0002… assigned only when an invoice is finalised, from a one-row counter locked while it is updated, so two invoices can never get the same number. Drafts never use a number, so deleting drafts never creates gaps; an invoice that has a number (finalised, then reopened) can't be deleted.
+- **Rules enforced in the database:** a finalised invoice and its lines can't be changed. A finalised invoice that hasn't been sent can be reopened to draft (it keeps its number). A sent invoice can only be duplicated into a new draft. Finalising needs at least one line and a price on every line.
+- **Functions** (logged-in admin or requester only): `create_invoice(lines)` (from the builder), `add_invoice_model_line(invoice, model, quantity)`, `finalise_invoice`, `reopen_invoice`, `duplicate_invoice`, `mark_invoice_sent(invoice, to)`, `set_default_customer`.
+- **Company details** for the invoice header, in `settings` (keys starting `company_`): name "Alexanders Toy Soldiers", address lines "14 Constance Road", "Twickenham", "TW2 7HY", phone "020-8894-5925", email "nik@ats-uk.net". Readable by both roles, editable by the admin on the Settings page.
+
+**Pages** ("Invoices" in the header for both roles):
+- `/invoices`: invoices newest first: number (or "Draft"), date, items, grand total, status, sent date. "New invoice", Open, Delete (drafts only, in-page confirm). A Customers section: add, edit, delete, set the default.
+- `/invoices/new` (builder): the whole catalogue (not retired models) in the catalogue's compact style (category sidebar, search, purple sticky headings, lavender alternate rows). Columns: tick box, category tag, code, name, price, quantity. Typing a quantity ticks the row; unticking clears it. Models with no saved price show "No price" and can still be added (the price is set on the draft). A sticky bar at the bottom shows "N items · £total" and "Generate invoice", which creates a draft and opens it.
+- `/invoices/[id]` while a draft: the invoice layout with editable lines (quantity, unit price, remove), "+ Add model" (search), "+ Add free-text line" (description, quantity, price) and an editable invoice date. Everything autosaves. Buttons: Finalise, Download PDF (with a DRAFT watermark), Delete draft.
+- `/invoices/[id]` once finalised: read-only, with Send, Download PDF, Reopen (only if not sent) and Duplicate as new draft.
+
+**Invoice layout** (A4 portrait; the on-screen sheet and the PDF are built from the same measurements in `lib/invoice-layout.ts`):
+- Top left: company name, large and bold. Top right: address lines, phone and email.
+- Invoice number and date clearly shown; a "GRAND TOTAL" box at the top right.
+- Table: PRODUCT CODE | ITEM | AMOUNT | PRICE PER ITEM | TOTAL PRICE. Only real lines. Money right-aligned as "£1,234.56".
+- Long invoices flow onto extra pages with the table header repeated and "Page X of Y" at the bottom.
+- No VAT, no payment details, no "Bill to" (the layout has a place ready for one later).
+- PDFs are made on the server with `@react-pdf/renderer` (no headless browser, works on Vercel). File name: "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft Alexanders Toy Soldiers.pdf" for drafts).
+
+**Sending by email** (Gmail SMTP, `lib/email.ts`, the only place that sends mail, so it can be switched to Resend later):
+- Nodemailer with `GMAIL_USER` and `GMAIL_APP_PASSWORD` (server-side env vars only). From name "Alexanders Toy Soldiers", reply-to nik@ats-uk.net, PDF attached.
+- "Send" opens an in-page panel: To (pre-filled from the default customer, editable, with a "Save as a customer" tick), subject ("Invoice INV-0001 from Alexanders Toy Soldiers") and a short friendly message, all editable. Sending records `sent_at` and `sent_to` and shows a clear success or error. Sending again is allowed, with a "Sent before on…" notice.
+- Without the env vars the Send button says "Email not set up yet"; Download PDF still works.
 
 ## 8. Catalogue import (Phase 1)
 

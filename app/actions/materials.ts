@@ -176,6 +176,13 @@ export async function saveSetting(key: string, value: string): Promise<{ ok: tru
   if (!SETTINGS.some((s) => s.key === key)) return { ok: false, error: "Unknown setting." };
 
   const trimmed = String(value ?? "").trim();
+  if (key.startsWith("company_")) {
+    if (trimmed.length > 200) return { ok: false, error: "That's too long (200 characters at most)." };
+    if (key === "company_name" && !trimmed) return { ok: false, error: "The company name can't be empty." };
+    if (key === "company_email" && trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return { ok: false, error: "That doesn't look like an email address." };
+    }
+  }
   if (key === "resin_charge_divisor") {
     const n = Number(trimmed);
     if (!(n > 0) || n > 10000) return { ok: false, error: "Enter a number above 0, e.g. 15." };

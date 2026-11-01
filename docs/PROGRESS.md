@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-11-01 (Models page clean-up, stale price fix)_
+_Last updated: 2026-11-01 (Phase 9: invoices)_
 
 ## Phases
 
@@ -18,7 +18,7 @@ _Last updated: 2026-11-01 (Models page clean-up, stale price fix)_
 | 6b | Colours, categories page, notepad count | Done (needs `0010` run, then testing) |
 | 7 | Money and stats | Done (needs `0012` run, then testing) |
 | 8 | Future-proofing and polish | Done (needs `0013`–`0015` run, then testing); custom domain still to do |
-| 9 | Invoices | Planned, not started (outline in the brief; model prices are in place) |
+| 9 | Invoices | Done (needs `0019` run, Gmail env vars, then testing) |
 
 ### 1. Foundations: Done
 - Next.js 16 app, Supabase email/password login, sign out, proxy guarding every page except `/login`
@@ -162,6 +162,23 @@ _Last updated: 2026-11-01 (Models page clean-up, stale price fix)_
 - Same dark purple sticky headings (`STICKY_HEADINGS`), soft lavender alternate rows (#f3f1f8) and light gold NEW rows as the catalogue
 - Checked in the browser pane at 1280px with made-up data (temporary preview page, not committed): rows 39px (30px controls + 4px padding + 1px border), price box 30px × 104px, 14px text, headings and row colours as intended, edit row lined up with the columns
 
+### 9. Invoices: Done (needs `0019` run, then testing)
+- `0019_invoices.sql`: `customers` (one default, `set_default_customer()`), `invoices`, `invoice_lines` (code, description and price copied in; `line_total` generated), `invoice_counter` (one row), `invoice_totals` view (security invoker), `is_app_user()`. One RLS policy per table for logged-in admin/requester users; nothing for anon/public
+  - Column grants: the app can only set an invoice's date and customer, and a line's position, description, quantity and price (code and model only via `add_invoice_model_line`). Number, status and sending only through the functions
+  - Guards: no changes to a finalised invoice or its lines; an invoice with a number can't be deleted (so no gaps); deleting a model or customer still works (it only clears the link)
+  - Functions: `create_invoice`, `add_invoice_model_line`, `finalise_invoice` (locks the counter row, so numbers never repeat; refuses with no lines or any unpriced line; keeps the number when finalised again after a reopen), `reopen_invoice` (not if sent), `duplicate_invoice`, `mark_invoice_sent`
+  - Company details as `company_` settings (seeded); settings policies split so both roles can read those keys and only the admin reads the rest or writes
+- Checked in PGlite (0001–0018, then 0019 twice): 51 checks pass, covering logged-out and no-profile users refused, requester builds/edits/finalises/reopens/duplicates/sends, copied lines unaffected by later catalogue changes, line price change leaves the model alone, protected columns refused, finalised lines/date/delete refused, INV-0001 → 0002 → 0003 with no skipping after deleting a draft, reopened numbered draft can't be deleted, sent invoices can't be reopened, one default customer, deleting a customer or model used on a finalised invoice, company settings readable by the requester but not writable
+- `/invoices` ("Invoices" in the header for both roles): list newest first (number or Draft, date, items, total and status from `invoice_totals`, sent date), Open, Delete for drafts that never had a number (in-page confirm), Customers section (add, edit, delete, make default)
+- `/invoices/new`: builder in the catalogue's style (sidebar with database counts, search, purple sticky headings, lavender rows; ticked rows light green); typing a quantity ticks, unticking clears; "Show ticked only"; sticky bottom bar "N items · £total" (+ how many have no price) and Generate invoice
+- `/invoices/[id]`: the invoice sheet (`components/invoice-sheet.tsx`) built from the same measurements as the PDF (`lib/invoice-layout.ts`). Drafts: quantity, price (amber outline when missing) and free-text description boxes that autosave, × to remove, "+ Add model" (search) and "+ Add free-text line", date box, Finalise (waits for any save still in progress; disabled until every line has a price), Download PDF, Delete draft. Finalised: Send…, Download PDF, Reopen (not if sent), Duplicate as new draft
+- PDF (`lib/invoice-pdf-document.tsx`, `lib/invoice-pdf.tsx`, route `/invoices/[id]/pdf`): `@react-pdf/renderer`, A4, table header repeated on every page, "Page X of Y", DRAFT watermark on drafts, no hyphenation. File name "INV-0001 Alexanders Toy Soldiers.pdf" ("Draft …" for drafts). Checked by rendering a 6-line draft and a 70-line invoice through the dev server: 1 and 3 pages, header repeated, totals right
+- Email (`lib/email.ts`, the only module that sends mail): Nodemailer over Gmail SMTP with `GMAIL_USER` / `GMAIL_APP_PASSWORD`; from name and reply-to come from the company settings; PDF attached. Send panel: To (from the invoice's or default customer), "Save as a customer", subject, message; records sent_at / sent_to; "Sent before on…". Without the env vars the button says "Email not set up yet". Not tested with a real Gmail account (needs the app password)
+- Settings page: company name, three address lines, phone and email
+- Header: the Notepad and Invoices links are now inside `<Suspense>` (plain links as the fallback) because pages with an id in the address (`/invoices/[id]`) can't know the address at build time
+- Catalogue's `CategoryButton` and `CategoryTag` moved to `components/category-nav.tsx` (shared with the builder); the catalogue looks the same
+- Screens checked in the browser pane at 1280px with made-up data (temporary preview page, not committed): builder ticking/unticking and bar, draft sheet with boxes, finalised view with the Send panel, list. Not checked against the real database (Claude can't log in)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -186,6 +203,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0016_security_advisor.sql` | 8 | the five requester views become functions, `rls_auto_enable()` locked down, faster policies, categories policies split | ☐ |
 | `0017_request_lines_policies.sql` | 8 | request_lines write policies check for an admin/requester profile instead of `true`; admin RPCs re-revoked from public/anon | ☐ |
 | `0018_urgency_prices.sql` | 8+ | URGENT → ASAP and removed; `models.price`; `catalogue_models()` with price; `set_models_price()`, `set_category_price()` | ☐ |
+| `0019_invoices.sql` | 9 | customers, invoices, invoice lines, numbering counter, `invoice_totals`, invoice functions, company settings readable by both roles | ☐ |
 
 Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
 
@@ -204,9 +222,15 @@ Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admi
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.
 - Colour names much longer than "Sky Blue (out of stock)" are cut off in the closed colour box (shown in full when it's open).
 - The app needs `0018` run: the Models page reads `models.price`, so it shows an error until then.
-- Model prices aren't shown anywhere except the Models page yet (on purpose, until Phase 9).
+- Invoices need `0019` run; sending needs `GMAIL_USER` and `GMAIL_APP_PASSWORD` (locally in `.env.local`, and in Vercel).
+- Invoice emails go out from the Gmail address itself (Gmail doesn't allow another "from" address); the name shown is the company name and replies go to the company email.
+- On a phone the invoice sheet is wider than the screen and scrolls sideways (it's an A4 page).
+- Lines can't be reordered on a draft (they keep the order they were added in).
 
 **Decisions made along the way**
+- Invoices: a line with no price blocks Finalise (rather than invoicing £0 by mistake).
+- Invoices: a draft that has a number (finalised, then reopened) can't be deleted, so invoice numbers never have gaps. Only never-finalised drafts can be deleted.
+- Invoices, lines and customers are shared by both accounts (like request lines); "Delete" on the list only shows for deletable drafts.
 - Two urgency levels only (ASAP, PRIORITY). URGENT lines were turned into ASAP rather than PRIORITY so nothing became less urgent.
 - Bulk "Set price" ignores models already at that exact price when counting, so the confirm button only counts real changes.
 - Request lines are shared by both accounts (no per-user owner), hence "Show all current requests".

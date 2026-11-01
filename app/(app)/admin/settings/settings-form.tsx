@@ -14,6 +14,7 @@ export function SettingsForm({ values }: { values: Record<string, string> }) {
           settingKey={s.key}
           label={s.label}
           help={s.help}
+          kind={s.kind}
           initial={values[s.key] ?? s.defaultValue}
         />
       ))}
@@ -25,11 +26,13 @@ function SettingRow({
   settingKey,
   label,
   help,
+  kind,
   initial,
 }: {
   settingKey: string;
   label: string;
   help: string;
+  kind: "number" | "text";
   initial: string;
 }) {
   const [saved, setSaved] = useState(initial);
@@ -67,13 +70,13 @@ function SettingRow({
       <div className="flex flex-wrap items-center gap-3">
         <input
           id={id}
-          inputMode="decimal"
+          inputMode={kind === "number" ? "decimal" : "text"}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);
             setStatus({ kind: "idle" });
           }}
-          className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+          className={`${kind === "number" ? "w-32" : "w-full max-w-md"} rounded-md border border-neutral-300 px-3 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900`}
         />
         <button
           type="submit"
