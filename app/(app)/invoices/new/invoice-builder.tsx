@@ -266,10 +266,10 @@ const BuilderRow = memo(function BuilderRow({
       <span className="hidden min-w-0 md:flex">
         <CategoryTag name={model.categoryName} colour={model.categoryColour} />
       </span>
-      <span className="hidden truncate font-mono md:block" title={model.code}>
+      <span className="hidden truncate font-mono md:block" data-tip={model.code}>
         {model.code}
       </span>
-      <span className="min-w-0 truncate" title={`${model.code} ${model.name}`}>
+      <span className="min-w-0 truncate" data-tip={`${model.code} ${model.name}`}>
         <span className="font-mono text-neutral-500 md:hidden">{model.code} </span>
         {model.name}
       </span>

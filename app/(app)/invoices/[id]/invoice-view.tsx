@@ -133,7 +133,7 @@ export function InvoiceView({
   const removeButton = (line: InvoiceLine) => (
     <button
       type="button"
-      title="Remove this line"
+      data-tip="Remove this line"
       aria-label={`Remove ${line.code ?? line.description}`}
       onClick={() =>
         run(async () => {
@@ -653,7 +653,7 @@ function FinalisedActions({
         onClick={() => setSendOpen((o) => !o)}
         disabled={!emailReady}
         aria-expanded={sendOpen}
-        title={emailReady ? undefined : "Add the SMTP_ settings (see Settings → Email) to turn on sending"}
+        data-tip={emailReady ? undefined : "Add the SMTP_ settings (see Settings → Email) to turn on sending"}
         className={primary}
       >
         {emailReady ? "Send…" : "Email not set up yet"}

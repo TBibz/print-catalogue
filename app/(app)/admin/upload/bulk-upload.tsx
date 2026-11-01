@@ -268,7 +268,7 @@ export function BulkUpload({ models: serverModels }: { models: UploadModel[] }) 
                 key={entry.id}
                 className="grid grid-cols-1 gap-x-4 gap-y-1 border-b border-neutral-100 px-3 py-2.5 text-sm sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,18rem)] sm:items-center"
               >
-                <span className="truncate font-mono" title={entry.file.name}>
+                <span className="truncate font-mono" data-tip={entry.file.name}>
                   {entry.file.name}
                 </span>
                 <span className="min-w-0 truncate">

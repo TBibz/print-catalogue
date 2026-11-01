@@ -655,12 +655,12 @@ function ModelInfo({
     >
       <span
         className={oneLine ? "min-w-[4rem] truncate" : "break-words"}
-        title={oneLine ? model.name : undefined}
+        data-tip={oneLine ? model.name : undefined}
       >
         {model.name}
       </span>
       {hasImage && (
-        <span className="shrink-0 text-neutral-400" title="Hover to see the image">
+        <span className="shrink-0 text-neutral-400" data-tip="Hover to see the image">
           <ImageIcon />
         </span>
       )}

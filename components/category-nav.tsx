@@ -28,7 +28,7 @@ export function CategoryButton({
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
       style={filled}
-      title={label}
+      data-tip={label}
       className={`flex w-full items-center justify-between gap-1.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors ${
         selected
           ? colour
@@ -51,7 +51,7 @@ export function CategoryButton({
 // A small category tag: its colour stripe and name.
 export function CategoryTag({ name, colour }: { name: string; colour: string }) {
   return (
-    <span className="inline-flex max-w-[8rem] min-w-0 shrink-0 items-center gap-1 text-xs text-neutral-600" title={name}>
+    <span className="inline-flex max-w-[8rem] min-w-0 shrink-0 items-center gap-1 text-xs text-neutral-600" data-tip={name}>
       <ColourStripe hex={colour} />
       <span className="truncate">{name}</span>
     </span>

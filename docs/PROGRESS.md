@@ -191,6 +191,12 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - Shared category sidebar (catalogue too): one line per category, slightly smaller text (13px), names that don't fit end in "…" with a tooltip; widened from 10rem to 11rem so "PERSONALITIES" fits even with a three-digit count. The catalogue table is 1rem narrower as a result
 - Checked with sample data in the browser pane at 1440px and phone width (temporary preview page, not committed)
 
+### Centred invoice pages and our own tooltips: Done
+- Invoice pages are centred (`mx-auto` in `app/(app)/invoices/layout.tsx`): equal space either side, back link / title / description / table / bottom bar all share the block's left edge
+- Stuck tooltip (e.g. "Base006 50mm x 45mm" in the top-left corner under the nav): it was the browser's own `title` tooltip, which some browsers draw in the wrong place. The app had no shared tooltip, so there's now one (`components/tooltips.tsx`, mounted once in the app layout): placed from the hovered element's position, shown after 350ms, hidden on mouse leave, scroll, click, typing or leaving the window, kept inside the window. Every `title=` in the app (33: builder, catalogue, queue, Start print, models, prices, categories, upload, notepad, invoices, request controls, category sidebar and tags) is now `data-tip=`
+- Checked with sample data in the browser pane at 1440px: block centred with 220px each side, tooltip appears 6px below the hovered name and goes away when the mouse moves off (temporary preview page, not committed)
+- A tooltip on a disabled button may not show in Safari (it doesn't report the mouse over disabled buttons); the button text still explains it in those places
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.

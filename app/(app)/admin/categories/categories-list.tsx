@@ -293,7 +293,7 @@ function CategoryRow({
           <div className="col-span-2 flex items-center gap-1 md:col-span-1">
             <span
               aria-hidden
-              title="Drag to reorder"
+              data-tip="Drag to reorder"
               onMouseDown={() => setHandleHeld(true)}
               onMouseUp={() => setHandleHeld(false)}
               className="flex h-9 w-6 cursor-grab items-center justify-center text-lg text-neutral-400 select-none hover:text-neutral-700 active:cursor-grabbing"
@@ -366,7 +366,7 @@ function CategoryRow({
               }}
               aria-expanded={scalePanel}
               disabled={modelCount === 0}
-              title={modelCount === 0 ? "This category has no models" : "Set the default scale of its models"}
+              data-tip={modelCount === 0 ? "This category has no models" : "Set the default scale of its models"}
               className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-30"
             >
               Set scale…
@@ -381,7 +381,7 @@ function CategoryRow({
               }}
               aria-expanded={pricePanel}
               disabled={modelCount === 0}
-              title={modelCount === 0 ? "This category has no models" : "Set the price of its models"}
+              data-tip={modelCount === 0 ? "This category has no models" : "Set the price of its models"}
               className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-30"
             >
               Set price…
@@ -392,7 +392,7 @@ function CategoryRow({
               type="button"
               onClick={() => setConfirmingDelete(true)}
               disabled={pending || modelCount > 0}
-              title={modelCount > 0 ? "Only empty categories can be deleted" : undefined}
+              data-tip={modelCount > 0 ? "Only empty categories can be deleted" : undefined}
               className="rounded-md border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-400 disabled:hover:bg-white"
             >
               Delete

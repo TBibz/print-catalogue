@@ -330,7 +330,7 @@ function NoteRow({
         {status.kind === "saving" && <span className="text-neutral-500">Saving…</span>}
         {status.kind === "saved" && <span className="text-green-700">Saved ✓</span>}
         {status.kind === "error" && (
-          <span role="alert" className="text-red-700" title={status.message}>
+          <span role="alert" className="text-red-700" data-tip={status.message}>
             {status.message}
           </span>
         )}

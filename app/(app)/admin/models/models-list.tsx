@@ -393,13 +393,13 @@ export function ModelsList({
                     onChange={(e) => toggle(m.id, e.target.checked)}
                     className="h-4 w-4 cursor-pointer accent-neutral-900 md:hidden"
                   />
-                  <span className="truncate" title={m.code}>
+                  <span className="truncate" data-tip={m.code}>
                     {m.code}
                   </span>
                 </span>
                 {/* One line: name (cut short with "…", full on hover), badges, notes. */}
                 <span className="col-start-1 flex min-w-0 items-center gap-2 md:col-start-auto">
-                  <span className="min-w-0 truncate" title={m.name}>
+                  <span className="min-w-0 truncate" data-tip={m.name}>
                     {m.name}
                   </span>
                   {isNew ? (
@@ -410,7 +410,7 @@ export function ModelsList({
                     m.show_new_badge && (
                       <span
                         className="shrink-0 text-xs whitespace-nowrap text-neutral-500"
-                        title={`The NEW badge turns off once ${NEW_BADGE_PRINT_LIMIT} have been printed`}
+                        data-tip={`The NEW badge turns off once ${NEW_BADGE_PRINT_LIMIT} have been printed`}
                       >
                         NEW ended
                       </span>
@@ -419,7 +419,7 @@ export function ModelsList({
                   <span className="shrink-0 text-xs whitespace-nowrap text-neutral-500">Printed {printed}</span>
                   {m.admin_notes && (
                     // The note only gets the space left over, so the name keeps its room.
-                    <span className="w-0 min-w-0 flex-1 truncate text-xs text-neutral-500" title={m.admin_notes}>
+                    <span className="w-0 min-w-0 flex-1 truncate text-xs text-neutral-500" data-tip={m.admin_notes}>
                       {m.admin_notes}
                     </span>
                   )}
@@ -428,10 +428,10 @@ export function ModelsList({
                   {m.categoryName}
                   {sizes && ` · ${sizes}`}
                 </span>
-                <span className="hidden truncate text-neutral-600 md:block" title={m.categoryName}>
+                <span className="hidden truncate text-neutral-600 md:block" data-tip={m.categoryName}>
                   {m.categoryName}
                 </span>
-                <span className="hidden truncate text-neutral-600 md:block" title={sizes || undefined}>
+                <span className="hidden truncate text-neutral-600 md:block" data-tip={sizes || undefined}>
                   {sizes || "—"}
                 </span>
                 <span className="col-start-1 md:col-start-auto">{priceBox(m)}</span>

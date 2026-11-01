@@ -356,7 +356,7 @@ function RemoveButton({ label, onClick }: { label: string; onClick: () => void }
       type="button"
       onClick={onClick}
       aria-label={label}
-      title={label}
+      data-tip={label}
       className="flex h-9 w-9 items-center justify-center rounded-full text-xl text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
     >
       ×

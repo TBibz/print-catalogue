@@ -122,17 +122,17 @@ export function PriceCell({
         {/* A small mark beside the box, so the row stays one line. */}
         <span className="w-4 shrink-0 text-center text-xs" aria-live="polite">
           {status.kind === "saving" && (
-            <span className="text-neutral-400" title="Saving…">
+            <span className="text-neutral-400" data-tip="Saving…">
               …<span className="sr-only">Saving</span>
             </span>
           )}
           {status.kind === "saved" && (
-            <span className="text-green-700" title="Saved">
+            <span className="text-green-700" data-tip="Saved">
               ✓<span className="sr-only">Saved</span>
             </span>
           )}
           {status.kind === "error" && (
-            <span aria-hidden className="font-bold text-red-700" title={status.message}>
+            <span aria-hidden className="font-bold text-red-700" data-tip={status.message}>
               !
             </span>
           )}

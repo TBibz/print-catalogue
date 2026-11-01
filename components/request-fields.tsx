@@ -161,7 +161,7 @@ export function ScaleSelect({
         aria-label={label}
         value={value ?? ""}
         disabled={locked}
-        title={locked ? "Some are being printed, so the size can't be changed" : undefined}
+        data-tip={locked ? "Some are being printed, so the size can't be changed" : undefined}
         onChange={(e) => onChange(e.target.value || null)}
         className={`${selectBox} ${TEXT_LEFT}`}
       >
@@ -213,7 +213,7 @@ export function ColourSelect({
         aria-label={label}
         value={value ?? ""}
         disabled={locked}
-        title={tooltip}
+        data-tip={tooltip}
         onChange={(e) => onChange(e.target.value || null)}
         className={`${selectBox} ${TEXT_LEFT} text-transparent`}
       >
@@ -257,7 +257,7 @@ export function AddLineButton({ label, onClick }: { label: string; onClick: () =
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      data-tip={label}
       aria-label={label}
       className={`${ROW_HEIGHT} w-7 shrink-0 rounded-md border border-neutral-300 bg-white text-base leading-none text-neutral-600 hover:border-neutral-500 hover:bg-neutral-100 hover:text-neutral-900`}
     >
