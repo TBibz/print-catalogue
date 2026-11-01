@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-11-01 (two urgency levels, model prices, Phase 9 planned)_
+_Last updated: 2026-11-01 (Models page clean-up, stale price fix)_
 
 ## Phases
 
@@ -152,6 +152,15 @@ _Last updated: 2026-11-01 (two urgency levels, model prices, Phase 9 planned)_
 - The catalogue doesn't read `price` yet (it lists its columns explicitly)
 - Brief: URGENT removed everywhere, prices documented, Phase 9 (Invoices) outline added
 - Not checked in a browser (Claude can't log in). Lint and the build pass
+
+### Models page clean-up: Done
+- **Bug: Price boxes blank after "Set price…" on Categories.** Cause: Next.js keeps the Models page alive in the background. Coming back, the list did get the fresh prices from the server, but each Price box only read its price once, when it first appeared, and its key didn't change, so it kept its old (blank) text. Opening Edit made a new box, which read the right price, which is why it showed there. Fixes:
+  - `price-cell.tsx`: the box now follows the saved price it's given whenever that changes, except while you're typing in it or it's saving (so it never overwrites typing). The key-bump workaround for "Set price for N selected" is gone; that now goes through the same path
+  - `models-list.tsx`: every time the page is shown again (Next.js re-runs effects then, and the browser's Back button can bring it back without asking the server), it calls `router.refresh()`, so prices and scales changed elsewhere always show
+  - Checked: the Sizes column is drawn straight from the model data (no local copy), so a bulk scale change shows once fresh data arrives; the edit row reads its values when opened and closes when fresh data arrives
+- Compact rows like the catalogue: 30px controls (price box, Edit button, and every box in the edit row), about 4px row padding, 14px text, vertically centred; one line per model (name cut short with "…", full name on hover; admin note only gets the space left over). Price box `w-[6.5rem]`, fits "£ 9,999.99", with a small ✓ / … / ! mark beside it instead of a line underneath (`MoneyInput` has a new `compact` option)
+- Same dark purple sticky headings (`STICKY_HEADINGS`), soft lavender alternate rows (#f3f1f8) and light gold NEW rows as the catalogue
+- Checked in the browser pane at 1280px with made-up data (temporary preview page, not committed): rows 39px (30px controls + 4px padding + 1px border), price box 30px × 104px, 14px text, headings and row colours as intended, edit row lined up with the columns
 
 ## Migrations
 

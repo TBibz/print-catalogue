@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { setModelsPrice } from "@/app/actions/models";
 import { BulkPricePanel } from "@/components/bulk-price-panel";
 import {
@@ -15,6 +16,12 @@ import {
 } from "@/lib/catalogue";
 import { ModelEditor, MODEL_COLUMNS } from "./model-editor";
 import { PriceCell } from "./price-cell";
+import { STICKY_HEADINGS } from "@/components/sticky-headings";
+
+// Row colours, the same as the catalogue: every other row soft lavender
+// grey, NEW models light gold (which wins).
+const ALT_ROW = "even:bg-[#f3f1f8]";
+const NEW_ROW = "bg-amber-100/70";
 
 type Filter = "all" | Availability;
 
@@ -56,8 +63,6 @@ export function ModelsList({
   // Ticked models (for "Set price for N selected").
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [pricePanel, setPricePanel] = useState(false);
-  // Bumped after a bulk price change so every Price box shows the new price.
-  const [priceVersion, setPriceVersion] = useState(0);
 
   // Next.js keeps this page alive in the background between visits. When
   // the server sends fresh models, show those.
@@ -69,6 +74,18 @@ export function ModelsList({
     setSelected(new Set());
     setPricePanel(false);
   }
+
+  // Next.js keeps this page alive in the background, and the browser's Back
+  // button can show it again without asking the server. Effects run again
+  // each time the page is shown, so ask for fresh models then (not on the
+  // very first showing, which already has fresh data). The rows above then
+  // pick them up, e.g. prices or scales changed on the Categories page.
+  const router = useRouter();
+  const shownBefore = useRef(false);
+  useEffect(() => {
+    if (shownBefore.current) router.refresh();
+    shownBefore.current = true;
+  }, [router]);
 
   // Changing the search or filters clears the ticks, so a bulk change only
   // ever touches models you can see.
@@ -156,7 +173,7 @@ export function ModelsList({
 
   const priceBox = (m: AdminModel) => (
     <PriceCell
-      key={`${m.id}@${priceVersion}`}
+      key={m.id}
       modelId={m.id}
       code={m.code}
       price={m.price}
@@ -305,7 +322,6 @@ export function ModelsList({
                   selectedIds.includes(m.id) && (!onlyUnset || m.price === null) ? { ...m, price } : m,
                 ),
               );
-              setPriceVersion((v) => v + 1);
             }}
             onClose={() => setPricePanel(false)}
           />
@@ -313,24 +329,23 @@ export function ModelsList({
       )}
 
       <div className="border-t border-neutral-200">
-        <div
-          className={`hidden gap-4 border-b border-neutral-200 px-3 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase md:grid ${MODEL_COLUMNS}`}
-        >
-          <span>
+        {/* Same headings as the catalogue: dark purple, sticky under the header. */}
+        <div className={`${STICKY_HEADINGS} hidden items-center gap-x-3 px-3 py-2 md:grid ${MODEL_COLUMNS}`}>
+          <span className="flex">
             <input
               type="checkbox"
               aria-label={`Select all ${visible.length} shown`}
               checked={allShownTicked}
               disabled={shownIds.length === 0}
               onChange={(e) => toggleAllShown(e.target.checked)}
-              className="h-4 w-4 cursor-pointer accent-neutral-900"
+              className="h-4 w-4 cursor-pointer accent-white"
             />
           </span>
           <span>Code</span>
           <span>Name</span>
           <span>Category</span>
           <span>Sizes</span>
-          <span className="text-right">Price</span>
+          <span className="pr-5 text-right">Price</span>
           <span>Availability</span>
           <span />
         </div>
@@ -338,21 +353,29 @@ export function ModelsList({
           {editing === "new" && (
             <ModelEditor key="new" model={null} requestCount={0} priceBox={null} {...editorProps} />
           )}
-          {visible.map((m) =>
-            m.id === editing ? (
-              <ModelEditor
-                key={m.id}
-                model={m}
-                requestCount={requestCounts[m.id] ?? 0}
-                priceBox={priceBox(m)}
-                {...editorProps}
-              />
-            ) : (
+          {visible.map((m) => {
+            if (m.id === editing) {
+              return (
+                <ModelEditor
+                  key={m.id}
+                  model={m}
+                  requestCount={requestCounts[m.id] ?? 0}
+                  priceBox={priceBox(m)}
+                  {...editorProps}
+                />
+              );
+            }
+            const printed = printTotals[m.id] ?? 0;
+            const isNew = showNewBadge(m, printed);
+            const sizes = [m.default_scale, ...m.other_scales].filter(Boolean).join(", ");
+            return (
               <li
                 key={m.id}
-                className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-neutral-100 px-3 py-3 md:py-2.5 ${MODEL_COLUMNS}`}
+                className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-neutral-100 px-3 py-1 text-sm ${MODEL_COLUMNS} ${
+                  isNew ? NEW_ROW : ALT_ROW
+                }`}
               >
-                <span className="hidden md:block">
+                <span className="hidden md:flex">
                   <input
                     type="checkbox"
                     aria-label={`Select ${m.code}`}
@@ -361,7 +384,7 @@ export function ModelsList({
                     className="h-4 w-4 cursor-pointer accent-neutral-900"
                   />
                 </span>
-                <span className="flex items-center gap-2 font-mono text-sm">
+                <span className="flex min-w-0 items-center gap-2 font-mono">
                   {/* On phones the tick box sits next to the code. */}
                   <input
                     type="checkbox"
@@ -370,42 +393,48 @@ export function ModelsList({
                     onChange={(e) => toggle(m.id, e.target.checked)}
                     className="h-4 w-4 cursor-pointer accent-neutral-900 md:hidden"
                   />
-                  {m.code}
+                  <span className="truncate" title={m.code}>
+                    {m.code}
+                  </span>
                 </span>
-                <span className="col-start-1 min-w-0 md:col-start-auto">
-                  <span className="break-words">{m.name}</span>
-                  {showNewBadge(m, printTotals[m.id] ?? 0) ? (
-                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-800">
+                {/* One line: name (cut short with "…", full on hover), badges, notes. */}
+                <span className="col-start-1 flex min-w-0 items-center gap-2 md:col-start-auto">
+                  <span className="min-w-0 truncate" title={m.name}>
+                    {m.name}
+                  </span>
+                  {isNew ? (
+                    <span className="shrink-0 rounded bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">
                       NEW
                     </span>
                   ) : (
                     m.show_new_badge && (
                       <span
-                        className="ml-2 align-middle text-xs text-neutral-500"
+                        className="shrink-0 text-xs whitespace-nowrap text-neutral-500"
                         title={`The NEW badge turns off once ${NEW_BADGE_PRINT_LIMIT} have been printed`}
                       >
                         NEW ended
                       </span>
                     )
                   )}
-                  <span className="ml-2 align-middle text-xs text-neutral-500">
-                    Printed {printTotals[m.id] ?? 0}
-                  </span>
+                  <span className="shrink-0 text-xs whitespace-nowrap text-neutral-500">Printed {printed}</span>
                   {m.admin_notes && (
-                    <span className="block truncate text-xs text-neutral-500" title={m.admin_notes}>
+                    // The note only gets the space left over, so the name keeps its room.
+                    <span className="w-0 min-w-0 flex-1 truncate text-xs text-neutral-500" title={m.admin_notes}>
                       {m.admin_notes}
                     </span>
                   )}
-                  <span className="block text-xs text-neutral-500 md:hidden">
-                    {m.categoryName}
-                    {m.default_scale && ` · ${[m.default_scale, ...m.other_scales].join(", ")}`}
-                  </span>
                 </span>
-                <span className="hidden text-sm text-neutral-600 md:block">{m.categoryName}</span>
-                <span className="hidden text-sm text-neutral-600 md:block">
-                  {[m.default_scale, ...m.other_scales].filter(Boolean).join(", ") || "—"}
+                <span className="col-start-1 truncate text-xs text-neutral-500 md:hidden">
+                  {m.categoryName}
+                  {sizes && ` · ${sizes}`}
                 </span>
-                <span className="col-start-1 w-36 md:col-start-auto md:w-auto">{priceBox(m)}</span>
+                <span className="hidden truncate text-neutral-600 md:block" title={m.categoryName}>
+                  {m.categoryName}
+                </span>
+                <span className="hidden truncate text-neutral-600 md:block" title={sizes || undefined}>
+                  {sizes || "—"}
+                </span>
+                <span className="col-start-1 md:col-start-auto">{priceBox(m)}</span>
                 <span className="col-start-1 md:col-start-auto">
                   <span
                     className={`inline-block rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap ${AVAILABILITY_STYLES[m.availability]}`}
@@ -416,13 +445,13 @@ export function ModelsList({
                 <button
                   type="button"
                   onClick={() => openEditor(m.id)}
-                  className="col-start-2 row-span-4 row-start-1 self-center rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 md:col-start-auto md:row-span-1 md:row-start-auto"
+                  className="col-start-2 row-span-5 row-start-1 h-7.5 self-center rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-700 hover:bg-neutral-100 md:col-start-auto md:row-span-1 md:row-start-auto"
                 >
                   Edit
                 </button>
               </li>
-            ),
-          )}
+            );
+          })}
         </ul>
         {visible.length === 0 && editing !== "new" && (
           <p className="py-12 text-center text-neutral-500">No models match.</p>

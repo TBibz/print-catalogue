@@ -13,6 +13,7 @@ export function MoneyInput({
   id,
   allowNegative = false,
   className = "w-32",
+  compact = false,
 }: {
   value: string; // as typed
   onChange: (value: string) => void;
@@ -21,6 +22,7 @@ export function MoneyInput({
   id?: string;
   allowNegative?: boolean;
   className?: string; // width
+  compact?: boolean; // 30px high with 14px text, for table rows
 }) {
   const invalid = Number.isNaN(parseMoney(value, { allowNegative }));
   return (
@@ -45,7 +47,7 @@ export function MoneyInput({
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
         }}
-        className={`h-11 w-full rounded-md border bg-white py-2 pr-2.5 pl-6 text-right text-base tabular-nums outline-none focus:ring-1 ${
+        className={`${compact ? "h-7.5 py-1 text-sm" : "h-11 py-2 text-base"} w-full rounded-md border bg-white pr-2.5 pl-6 text-right tabular-nums outline-none focus:ring-1 ${
           invalid
             ? "border-red-600 focus:ring-red-600"
             : "border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900"

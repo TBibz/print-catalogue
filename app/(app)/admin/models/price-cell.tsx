@@ -32,9 +32,21 @@ export function PriceCell({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busy = useRef(false);
   const again = useRef(false);
+  const focused = useRef(false);
 
-  // `price` is only read when the box first appears. After a bulk "Set
-  // price" the list gives every box a new key, so they start again.
+  // Always show the current saved price. `price` changes when the list gets
+  // fresh data (coming back to the page, which Next.js keeps alive in the
+  // background) or after "Set price for N selected". The box only follows
+  // it while you aren't typing in it or saving, so it never overwrites what
+  // you're typing.
+  useEffect(() => {
+    if (focused.current || timer.current || busy.current) return;
+    const next = price === null ? null : Number(price);
+    if (next === savedRef.current && parseMoney(textRef.current) === next) return;
+    savedRef.current = next;
+    textRef.current = asText(next);
+    setText(textRef.current);
+  }, [price]);
 
   async function save() {
     if (timer.current) {
@@ -88,29 +100,49 @@ export function PriceCell({
       onKeyDown={(e) => {
         if (e.key === "Enter") e.preventDefault();
       }}
+      onFocus={() => (focused.current = true)}
+      onBlur={() => (focused.current = false)}
     >
-      <MoneyInput
-        label={`Price for ${code}`}
-        value={text}
-        className="w-full"
-        onChange={(v) => {
-          textRef.current = v;
-          setText(v);
-          setStatus({ kind: "idle" });
-          if (timer.current) clearTimeout(timer.current);
-          timer.current = setTimeout(() => void save(), TYPING_PAUSE_MS);
-        }}
-        onBlur={() => void save()}
-      />
-      <span className="block min-h-4 text-right text-xs" aria-live="polite">
-        {status.kind === "saving" && <span className="text-neutral-500">Saving…</span>}
-        {status.kind === "saved" && <span className="text-green-700">Saved ✓</span>}
-        {status.kind === "error" && (
-          <span role="alert" className="text-red-700">
-            {status.message}
-          </span>
-        )}
+      <span className="flex items-center gap-1">
+        {/* Just wide enough for "£ 9,999.99". */}
+        <MoneyInput
+          label={`Price for ${code}`}
+          value={text}
+          compact
+          className="w-[6.5rem]"
+          onChange={(v) => {
+            textRef.current = v;
+            setText(v);
+            setStatus({ kind: "idle" });
+            if (timer.current) clearTimeout(timer.current);
+            timer.current = setTimeout(() => void save(), TYPING_PAUSE_MS);
+          }}
+          onBlur={() => void save()}
+        />
+        {/* A small mark beside the box, so the row stays one line. */}
+        <span className="w-4 shrink-0 text-center text-xs" aria-live="polite">
+          {status.kind === "saving" && (
+            <span className="text-neutral-400" title="Saving…">
+              …<span className="sr-only">Saving</span>
+            </span>
+          )}
+          {status.kind === "saved" && (
+            <span className="text-green-700" title="Saved">
+              ✓<span className="sr-only">Saved</span>
+            </span>
+          )}
+          {status.kind === "error" && (
+            <span aria-hidden className="font-bold text-red-700" title={status.message}>
+              !
+            </span>
+          )}
+        </span>
       </span>
+      {status.kind === "error" && (
+        <span role="alert" className="block text-xs text-red-700">
+          {status.message}
+        </span>
+      )}
     </div>
   );
 }

@@ -24,10 +24,15 @@ import {
 // Column widths shared by the list rows and the editor (md screens and up).
 // Tick box, code, name, category, sizes, price, availability, Edit.
 export const MODEL_COLUMNS =
-  "md:grid-cols-[1.5rem_7rem_minmax(0,1fr)_10rem_8rem_8.5rem_8rem_6rem]";
+  "md:grid-cols-[1rem_6rem_minmax(8rem,1fr)_9rem_7rem_8rem_7rem_4.5rem]";
 
+// The admin notes box: same look, but grows with its rows.
+const textareaBox =
+  "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
+
+// 30px high with 14px text, like the catalogue's controls.
 const box =
-  "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
+  "h-7.5 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-sm outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 
 function inputFrom(model: AdminModel | null): ModelInput {
   return {
@@ -154,7 +159,7 @@ export function ModelEditor({
         noValidate
       >
         {/* ---- Row: the same columns as the list -------------------- */}
-        <div className={`grid grid-cols-1 gap-3 md:items-start md:gap-4 ${MODEL_COLUMNS}`}>
+        <div className={`grid grid-cols-1 gap-2 text-sm md:items-start md:gap-x-3 ${MODEL_COLUMNS}`}>
           {/* The tick-box column stays empty while editing. */}
           <span className="hidden md:block" />
           <div>
@@ -227,7 +232,7 @@ export function ModelEditor({
           </div>
           <div>
             <span className={fieldLabel}>Price</span>
-            {priceBox ?? <p className="py-2 text-sm text-neutral-500">Add the model first</p>}
+            {priceBox ?? <p className="py-1 text-xs text-neutral-500">Add the model first</p>}
           </div>
           <div>
             <label htmlFor="edit-availability" className={fieldLabel}>
@@ -252,7 +257,7 @@ export function ModelEditor({
             <button
               type="submit"
               disabled={pending || (model !== null && !dirty)}
-              className="flex-1 rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-40"
+              className="h-7.5 flex-1 rounded-md bg-neutral-900 px-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-40"
             >
               {pending ? "Saving…" : model ? "Save" : "Add"}
             </button>
@@ -260,7 +265,7 @@ export function ModelEditor({
               type="button"
               onClick={onCancel}
               disabled={pending}
-              className="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+              className="h-7.5 flex-1 rounded-md border border-neutral-300 bg-white px-2 text-sm text-neutral-700 hover:bg-neutral-100"
             >
               Cancel
             </button>
@@ -346,7 +351,7 @@ export function ModelEditor({
               rows={2}
               value={values.adminNotes}
               onChange={(e) => set("adminNotes", e.target.value)}
-              className={`${box} text-sm`}
+              className={`${textareaBox}`}
             />
             {fieldError("adminNotes")}
           </PanelSection>
