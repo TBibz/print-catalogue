@@ -185,6 +185,14 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - Settings → "Email" box (admin only): shows the server, port and from-address in use, or which settings are missing, and "Send test email" sends a plain message to a typed address (`app/actions/email.ts`)
 - `.env.local.example` updated
 
+### Invoice builder layout: Done
+- Invoice pages (list, builder, draft / finalised invoice) are at most 1000px wide (`app/(app)/invoices/layout.tsx`), left-aligned under the header
+- Builder: sidebar 11rem + table about 800px; snug columns (tick, category 7rem, code 5rem, name, price, qty), long names end in "…" with the full name on hover. The bottom bar is now sticky inside the table column instead of across the whole screen, so it has exactly the table's width and left edge
+- Shared category sidebar (catalogue too): one line per category, slightly smaller text (13px), names that don't fit end in "…" with a tooltip; widened from 10rem to 11rem so "PERSONALITIES" fits even with a three-digit count. The catalogue table is 1rem narrower as a result
+- Checked with sample data in the browser pane at 1440px and phone width (temporary preview page, not committed)
+
+## Migrations
+
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
 
 | File | Phase | What it does | Run? |
