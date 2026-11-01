@@ -208,6 +208,32 @@ export async function reopenInvoice(id: string): Promise<Done> {
   return { ok: true };
 }
 
+// Mark a finalised invoice as sent without emailing it (sent some other
+// way, possibly some time ago). The date can't be in the future.
+export async function markInvoiceSent(id: string, input: { date: string; to: string }): Promise<Done> {
+  const supabase = await client();
+  if (!supabase) return NOT_LOGGED_IN;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false, error: "Choose the date it was sent." };
+  const { error } = await supabase.rpc("mark_invoice_sent_manually", {
+    p_invoice_id: id,
+    p_date: input.date,
+    p_to: input.to.trim().slice(0, 320),
+  });
+  if (error) return friendly(error, "mark_invoice_sent_manually");
+  refresh();
+  return { ok: true };
+}
+
+// Undo a manual "Mark as sent" (emailed invoices can't be unmarked).
+export async function unmarkInvoiceSent(id: string): Promise<Done> {
+  const supabase = await client();
+  if (!supabase) return NOT_LOGGED_IN;
+  const { error } = await supabase.rpc("unmark_invoice_sent", { p_invoice_id: id });
+  if (error) return friendly(error, "unmark_invoice_sent");
+  refresh();
+  return { ok: true };
+}
+
 export async function deleteDraft(id: string): Promise<Done> {
   const supabase = await client();
   if (!supabase) return NOT_LOGGED_IN;

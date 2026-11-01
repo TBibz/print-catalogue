@@ -14,12 +14,14 @@ import {
   removeLine,
   reopenInvoice,
   sendInvoice,
+  unmarkInvoiceSent,
   setInvoiceDate,
   updateLine,
 } from "@/app/actions/invoices";
 import { useImagePreview } from "@/components/image-preview";
 import { InvoiceSheet, plainCell } from "@/components/invoice-sheet";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { MarkSentPanel } from "@/components/mark-sent-panel";
 import { MoneyInput } from "@/components/money-input";
 import type { InvoiceModel } from "@/lib/invoice-data";
 import { imageUrl } from "@/lib/images";
@@ -27,6 +29,7 @@ import { formatMoney, formatMoneyInput, parseMoney } from "@/lib/money";
 import {
   formatDateTime,
   formatInvoiceDate,
+  formatSentDate,
   invoiceTitle,
   PDF_ATTACHED_LINE,
   linesTotals,
@@ -654,7 +657,7 @@ function AddLines({
   );
 }
 
-// ---- Finalised: Send, Download, Reopen, Duplicate -----------------------------
+// ---- Finalised: Send, Mark as sent, Download, Reopen, Duplicate -------------
 
 function FinalisedActions({
   invoice,
@@ -676,11 +679,27 @@ function FinalisedActions({
   onDuplicate: () => void;
 }) {
   const [sendOpen, setSendOpen] = useState(false);
+  const [markOpen, setMarkOpen] = useState(false);
+  const [undoError, setUndoError] = useState<string | null>(null);
+  const [undoing, startUndo] = useTransition();
+  const manual = invoice.sent_method === "manual";
+
+  function undoMark() {
+    setUndoError(null);
+    startUndo(async () => {
+      const r = await unmarkInvoiceSent(invoice.id);
+      if (!r.ok) setUndoError(r.error);
+    });
+  }
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setSendOpen((o) => !o)}
+        onClick={() => {
+          setSendOpen((o) => !o);
+          setMarkOpen(false);
+        }}
         disabled={!emailReady}
         aria-expanded={sendOpen}
         data-tip={emailReady ? undefined : "Add the SMTP_ settings (see Settings → Email) to turn on sending"}
@@ -688,6 +707,20 @@ function FinalisedActions({
       >
         {emailReady ? "Send…" : "Email not set up yet"}
       </button>
+      {/* For invoices that went out some other way. */}
+      {!invoice.sent_at && (
+        <button
+          type="button"
+          onClick={() => {
+            setMarkOpen((o) => !o);
+            setSendOpen(false);
+          }}
+          aria-expanded={markOpen}
+          className={button}
+        >
+          Mark as sent…
+        </button>
+      )}
       <a href={pdfHref} download className={button}>
         Download PDF
       </a>
@@ -699,11 +732,30 @@ function FinalisedActions({
       <button type="button" onClick={onDuplicate} disabled={pending} className={button}>
         Duplicate as new draft
       </button>
-      {invoice.sent_at && (
+      {invoice.sent_at && !manual && (
         <span className="text-sm text-neutral-600">
           Sent {formatDateTime(invoice.sent_at)}
           {invoice.sent_to ? ` to ${invoice.sent_to}` : ""}. Sent invoices can’t be reopened.
         </span>
+      )}
+      {invoice.sent_at && manual && (
+        <>
+          <span className="text-sm text-neutral-600">
+            Marked as sent on {formatSentDate(invoice.sent_at)}
+            {invoice.sent_to ? ` (${invoice.sent_to})` : ""}. No email went from the site.
+          </span>
+          <button type="button" onClick={undoMark} disabled={undoing} className={button}>
+            {undoing ? "Undoing…" : "Undo mark as sent"}
+          </button>
+          {undoError && (
+            <span role="alert" className="font-medium text-red-700">
+              {undoError}
+            </span>
+          )}
+        </>
+      )}
+      {markOpen && !invoice.sent_at && (
+        <MarkSentPanel invoiceId={invoice.id} invoiceNumber={invoice.number} onClose={() => setMarkOpen(false)} />
       )}
       {sendOpen && emailReady && (
         <SendPanel invoice={invoice} company={company} customers={customers} onClose={() => setSendOpen(false)} />

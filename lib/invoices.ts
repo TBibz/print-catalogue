@@ -12,12 +12,15 @@ export type Invoice = {
   finalised_at: string | null;
   sent_at: string | null;
   sent_to: string | null;
+  // How it was sent: emailed from the site, or marked as sent by hand
+  // (sent some other way). null while not sent.
+  sent_method: "email" | "manual" | null;
   created_at: string;
   updated_at: string;
 };
 
 export const INVOICE_COLUMNS =
-  "id, number, status, invoice_date, customer_id, created_by, finalised_at, sent_at, sent_to, created_at, updated_at";
+  "id, number, status, invoice_date, customer_id, created_by, finalised_at, sent_at, sent_to, sent_method, created_at, updated_at";
 
 export type InvoiceLine = {
   id: string;
@@ -116,6 +119,12 @@ export function formatSentDate(iso: string) {
     year: "numeric",
     timeZone: "Europe/London",
   });
+}
+
+// Today's date in the UK, "2026-11-01" (the latest date an invoice can be
+// marked as sent).
+export function ukToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 }
 
 // Where an invoice is up to, for the status badge and the list filters:

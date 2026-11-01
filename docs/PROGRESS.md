@@ -224,6 +224,13 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - `invoiceSendState()` and `formatSentDate()` in `lib/invoices.ts`
 - Checked with sample invoices in the browser pane (1440px and phone): badges and dates right, each filter shows the right rows (temporary preview page, not committed)
 
+### Mark an invoice as sent without emailing: Done (needs `0020` run)
+- `0020_mark_invoice_sent.sql`: `sent_method` ('email' / 'manual', null while not sent, must match `sent_at`); existing sent invoices become 'email'; `mark_invoice_sent_manually(invoice, date, to)` (finalised and not yet sent, date today or earlier in UK time, stored as midday UK time so the date never shifts); `unmark_invoice_sent(invoice)` (manual only); emailing a marked invoice turns it into 'email'. Both roles; the app can't write `sent_method` directly
+- Invoice page: "Mark as sent…" next to Send while Not sent, opening `components/mark-sent-panel.tsx` (Date sent, Sent to optional, Mark as sent); marked invoices say "Marked as sent on … No email went from the site." with "Undo mark as sent", after which Reopen is offered again
+- Badge: "Sent 28 Oct 2026 (marked)" for manual ones (tooltip "Marked as sent by hand: no email went from the site")
+- Invoices list: "Mark as sent…" on each row in the Not sent view, opening the same panel under the row; columns rebalanced so the longer badge and the extra button fit
+- Checked in PGlite: marking (including by the requester), refusing a future date / a draft / a second mark, unmark only for manual, reopen blocked while marked and allowed after undo, logged-out refused, safe to run twice. UI checked with sample invoices in the browser pane (temporary preview page, not committed)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -249,6 +256,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0017_request_lines_policies.sql` | 8 | request_lines write policies check for an admin/requester profile instead of `true`; admin RPCs re-revoked from public/anon | ☐ |
 | `0018_urgency_prices.sql` | 8+ | URGENT → ASAP and removed; `models.price`; `catalogue_models()` with price; `set_models_price()`, `set_category_price()` | ☐ |
 | `0019_invoices.sql` | 9 | customers, invoices, invoice lines, numbering counter, `invoice_totals`, invoice functions, company settings readable by both roles | ☐ |
+| `0020_mark_invoice_sent.sql` | 9 | `invoices.sent_method` (existing sent ones become `email`), `mark_invoice_sent_manually()`, `unmark_invoice_sent()`; `mark_invoice_sent()` records `email` | ☐ |
 
 Also in `supabase/snippets/` (run by hand, never automatically):
 - `make-admin.sql` (one-off, makes your account admin)

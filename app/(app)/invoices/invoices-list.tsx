@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteDraft } from "@/app/actions/invoices";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { MarkSentPanel } from "@/components/mark-sent-panel";
 import { STICKY_HEADINGS } from "@/components/sticky-headings";
 import { formatMoney } from "@/lib/money";
 import { formatInvoiceDate, invoiceSendState, type InvoiceListRow, type InvoiceSendState } from "@/lib/invoices";
 
-const COLUMNS = "md:grid-cols-[7rem_9rem_5rem_7rem_10.5rem_minmax(0,1fr)_9.5rem]";
+const COLUMNS = "md:grid-cols-[6.5rem_8.5rem_4.5rem_6.5rem_12.5rem_minmax(0,1fr)_auto]";
 
 // The filter buttons above the list.
 type Filter = "all" | InvoiceSendState;
@@ -32,6 +33,8 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<Filter>("all");
+  // The invoice whose "Mark as sent" panel is open (Not sent view only).
+  const [marking, setMarking] = useState<string | null>(null);
 
   // Next.js keeps this page alive in the background: take fresh rows when
   // the server sends them, and ask for them each time the page is shown
@@ -41,6 +44,7 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
     setSynced(serverInvoices);
     setInvoices(serverInvoices);
     setConfirming(null);
+    setMarking(null);
   }
   const router = useRouter();
   const shownBefore = useRef(false);
@@ -79,7 +83,10 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
             key={f.key}
             type="button"
             aria-pressed={filter === f.key}
-            onClick={() => setFilter(f.key)}
+            onClick={() => {
+              setFilter(f.key);
+              setMarking(null);
+            }}
             className={`rounded-md border px-4 py-2 text-base ${
               filter === f.key
                 ? "border-neutral-900 bg-neutral-900 font-medium text-white"
@@ -131,6 +138,17 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
                 {inv.sent_at && inv.sent_to ? inv.sent_to : "—"}
               </span>
               <span className="col-span-2 flex justify-end gap-2 md:col-span-1">
+                {/* Quick "Mark as sent" while looking at what hasn't been sent. */}
+                {filter === "not_sent" && invoiceSendState(inv) === "not_sent" && (
+                  <button
+                    type="button"
+                    onClick={() => setMarking((m) => (m === inv.id ? null : inv.id))}
+                    aria-expanded={marking === inv.id}
+                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 whitespace-nowrap text-neutral-700 hover:bg-neutral-100"
+                  >
+                    Mark as sent…
+                  </button>
+                )}
                 <Link
                   href={`/invoices/${inv.id}`}
                   className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-neutral-700 hover:bg-neutral-100"
@@ -148,6 +166,11 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
                   </button>
                 )}
               </span>
+              {marking === inv.id && filter === "not_sent" && (
+                <div className="col-span-full py-2">
+                  <MarkSentPanel invoiceId={inv.id} invoiceNumber={inv.number} onClose={() => setMarking(null)} />
+                </div>
+              )}
               {confirming === inv.id && (
                 <div
                   role="alertdialog"
