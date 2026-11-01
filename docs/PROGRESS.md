@@ -214,6 +214,10 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - "The invoice is attached as a PDF." is in the default message, and `sendInvoice` adds it at the end if it's been deleted from the message
 - Checked by building the email with Nodemailer locally: attachment header and file name as above, line in the body; not yet tried with a real mail server
 
+### Test data reset snippet: Done (run by hand once, before real use)
+- `supabase/snippets/reset-test-data.sql`: TRUNCATE (no CASCADE) of the eight test-data tables plus `invoice_counter` back to 0, in one transaction, then a row count per table. TRUNCATE because the invoice and printing guards work row by row and would block a plain DELETE (checked: a plain delete of a printing request is refused)
+- Checked in PGlite with a finalised invoice, a draft, a printing and a completed job, requests, a note, a monthly row and a customer: all cleared, models (price, NEW flag), categories, materials, printers, settings (opening balance) and profiles unchanged, and the next finalised invoice was INV-0001
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -240,7 +244,9 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0018_urgency_prices.sql` | 8+ | URGENT → ASAP and removed; `models.price`; `catalogue_models()` with price; `set_models_price()`, `set_category_price()` | ☐ |
 | `0019_invoices.sql` | 9 | customers, invoices, invoice lines, numbering counter, `invoice_totals`, invoice functions, company settings readable by both roles | ☐ |
 
-Also in `supabase/snippets/`: `make-admin.sql` (one-off, makes your account admin).
+Also in `supabase/snippets/` (run by hand, never automatically):
+- `make-admin.sql` (one-off, makes your account admin)
+- `reset-test-data.sql` (one-off, **deletes data**: run once just before real use). Empties invoices, invoice lines, customers, print jobs and items, request lines, notepad lines and monthly money, and resets invoice numbering to INV-0001; keeps models, categories, materials, printers, settings and accounts. One transaction, ends with a row count per table
 
 ## Known bugs, loose ends and decisions
 
