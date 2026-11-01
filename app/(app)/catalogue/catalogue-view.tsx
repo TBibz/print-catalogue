@@ -15,6 +15,7 @@ import { useLineAutosave } from "@/lib/use-line-autosave";
 import { ANY_COLOUR, colourName, type ColourOption } from "@/lib/colours";
 import { STICKY_HEADINGS } from "@/components/sticky-headings";
 import { CategoryButton, CategoryTag } from "@/components/category-nav";
+import { useImagePreview } from "@/components/image-preview";
 import type { CategoryCounts } from "@/lib/data";
 import {
   AddLineButton,
@@ -444,7 +445,6 @@ type ModelItemProps = SlotCallbacks & {
 
 type ImageProps = { onOpenImage: (model: Row) => void };
 
-const PREVIEW_SIZE = 288; // px, the hover preview box
 
 // Every other list row: a soft lavender grey, visible but subtle.
 const ALT_ROW = "even:bg-[#f3f1f8]";
@@ -471,7 +471,6 @@ const outerKey = (showCategory: boolean, colourColumn: boolean) =>
 // Light gold for NEW models' rows and cards (takes priority over the
 // alternating grey).
 const NEW_ROW = "bg-amber-100/70";
-const PREVIEW_GAP = 20; // px between the pointer and the preview
 
 // memo: a row only re-renders when its own slots change, which keeps
 // typing smooth with hundreds of rows on screen.
@@ -486,22 +485,16 @@ const ModelRow = memo(function ModelRow({
   const comingSoon = model.availability === "coming_soon";
   const isNew = showNewBadge(model, model.printedTotal);
   const url = imageUrl(model.image_path);
-  // Where the pointer is while hovering the code/name (null = not hovering).
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  // Hover preview (shared with the invoice pages) while over the code/name.
+  const preview = useImagePreview(url, `${model.code} ${model.name}`);
 
   const open = () => {
     if (!url) return;
-    setPointer(null);
+    preview.hide();
     onOpenImage(model);
   };
   // Hover preview and click-to-enlarge only apply when there is an image.
-  const imageHandlers = url
-    ? {
-        onMouseMove: (e: React.MouseEvent) => setPointer({ x: e.clientX, y: e.clientY }),
-        onMouseLeave: () => setPointer(null),
-        onClick: open,
-      }
-    : {};
+  const imageHandlers = url ? { ...preview.handlers, onClick: open } : {};
 
   return (
     // One line per model where possible, everything on the same centre line.
@@ -520,7 +513,7 @@ const ModelRow = memo(function ModelRow({
         {model.code}
       </span>
 
-      {/* Hover: preview to the right of the pointer. Click: enlarge. */}
+      {/* Hover: preview beside the pointer, below the row. Click: enlarge. */}
       <div
         className={`min-w-0 ${url ? "cursor-zoom-in" : ""}`}
         {...imageHandlers}
@@ -544,7 +537,7 @@ const ModelRow = memo(function ModelRow({
           <CategoryTag name={model.categoryName} colour={model.categoryColour} />
         </span>
       )}
-      {pointer && url && <HoverPreview url={url} pointer={pointer} />}
+      {preview.element}
 
       {/* Below xl (phones, tablets, small laptops) the controls sit under the name. */}
       <div className="col-span-2 xl:col-span-1">
@@ -560,26 +553,6 @@ const ModelRow = memo(function ModelRow({
     </li>
   );
 });
-
-// The small preview that follows the pointer, to its right (or to its left
-// if there isn't room). Only on screens wide enough to have a pointer.
-function HoverPreview({ url, pointer }: { url: string; pointer: { x: number; y: number } }) {
-  const fitsRight = pointer.x + PREVIEW_GAP + PREVIEW_SIZE + 8 <= window.innerWidth;
-  const left = fitsRight ? pointer.x + PREVIEW_GAP : pointer.x - PREVIEW_GAP - PREVIEW_SIZE;
-  const top = Math.min(
-    Math.max(8, pointer.y - PREVIEW_SIZE / 2),
-    window.innerHeight - PREVIEW_SIZE - 8,
-  );
-  return (
-    <div
-      className="pointer-events-none fixed z-30 hidden rounded-lg border border-neutral-200 bg-white p-2 shadow-lg lg:block"
-      style={{ left, top, width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="" className="h-full w-full object-contain" />
-    </div>
-  );
-}
 
 // Grid view: one card per model, image on top, controls underneath.
 const ModelCard = memo(function ModelCard({
@@ -655,12 +628,13 @@ function ModelInfo({
     >
       <span
         className={oneLine ? "min-w-[4rem] truncate" : "break-words"}
-        data-tip={oneLine ? model.name : undefined}
+        // With an image, the hover preview shows the name instead.
+        data-tip={oneLine && !hasImage ? model.name : undefined}
       >
         {model.name}
       </span>
       {hasImage && (
-        <span className="shrink-0 text-neutral-400" data-tip="Hover to see the image">
+        <span className="shrink-0 text-neutral-400">
           <ImageIcon />
         </span>
       )}

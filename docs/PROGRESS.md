@@ -197,6 +197,12 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - Checked with sample data in the browser pane at 1440px: block centred with 220px each side, tooltip appears 6px below the hovered name and goes away when the mouse moves off (temporary preview page, not committed)
 - Loose end: a tooltip on a disabled button (e.g. Delete on a category that has models, "Email not set up yet") may not show in Safari, which doesn't report the mouse over disabled buttons. Not checked in Safari
 
+### Image preview on invoice pages: Done
+- The catalogue's hover preview is now a shared component (`components/image-preview.tsx`, `useImagePreview()`), used by the catalogue list, the invoice builder (code and name) and model lines on draft invoices (code and description). Same 288px picture, no delay, right of the pointer (left if there isn't room)
+- Changes for all three: it sits just below the hovered row (above it near the bottom of the window), so it never covers that row's tick box, quantity or other controls; code and name shown as a caption; hides on scroll and on any key press as well as on mouse leave. Models with an image show the preview instead of the text tooltip (catalogue name and builder code/name); without an image, just the tooltip
+- `loadInvoiceModels()` now includes `image_path`; draft lines look up their model's image from that list (a line whose model has since been retired shows no preview)
+- Checked with sample data in the browser pane at 1440px: preview below the hovered row and clear of it, flips above near the bottom, caption shown, no tooltip at the same time, hides on a key press and on scroll; rows without an image show only the tooltip (temporary preview page, not committed; pictures themselves not checked as the sample had no real images)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.

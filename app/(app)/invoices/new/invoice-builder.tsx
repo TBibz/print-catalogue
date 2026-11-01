@@ -7,10 +7,12 @@ import { useRouter } from "next/navigation";
 import { memo, useCallback, useMemo, useState, useTransition } from "react";
 import { createInvoice } from "@/app/actions/invoices";
 import { CategoryButton, CategoryTag } from "@/components/category-nav";
+import { useImagePreview } from "@/components/image-preview";
 import { STICKY_HEADINGS } from "@/components/sticky-headings";
 import { compareCategories, compareModels, type Category } from "@/lib/catalogue";
 import type { CategoryCounts } from "@/lib/data";
 import type { InvoiceModel } from "@/lib/invoice-data";
+import { imageUrl } from "@/lib/images";
 import { formatMoney } from "@/lib/money";
 
 const ALL = "all";
@@ -249,6 +251,11 @@ const BuilderRow = memo(function BuilderRow({
   onChange: (id: string, value: string) => void;
 }) {
   const ticked = Number(quantity) > 0;
+  // Hovering the code or name shows the model's image, with its code and
+  // name underneath (instead of the text tooltip). No image: just the tooltip.
+  const url = imageUrl(model.image_path);
+  const label = `${model.code} ${model.name}`;
+  const preview = useImagePreview(url, label);
   return (
     <li
       className={`grid items-center gap-x-3 border-b border-neutral-100 px-3 py-1 text-sm ${COLUMNS} ${
@@ -266,10 +273,10 @@ const BuilderRow = memo(function BuilderRow({
       <span className="hidden min-w-0 md:flex">
         <CategoryTag name={model.categoryName} colour={model.categoryColour} />
       </span>
-      <span className="hidden truncate font-mono md:block" data-tip={model.code}>
+      <span className="hidden truncate font-mono md:block" data-tip={url ? undefined : model.code} {...preview.handlers}>
         {model.code}
       </span>
-      <span className="min-w-0 truncate" data-tip={`${model.code} ${model.name}`}>
+      <span className="min-w-0 truncate" data-tip={url ? undefined : label} {...preview.handlers}>
         <span className="font-mono text-neutral-500 md:hidden">{model.code} </span>
         {model.name}
       </span>
@@ -286,6 +293,7 @@ const BuilderRow = memo(function BuilderRow({
         onChange={(e) => onChange(model.id, e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
         className="h-7.5 w-full rounded-md border border-neutral-300 bg-white px-2 text-center text-sm tabular-nums outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
       />
+      {preview.element}
     </li>
   );
 });

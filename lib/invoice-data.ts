@@ -113,6 +113,7 @@ export type InvoiceModel = {
   name: string;
   category_id: string;
   price: number | null;
+  image_path: string | null; // for the hover preview
 };
 
 export async function loadInvoiceModels(supabase: SupabaseClient): Promise<InvoiceModel[]> {
@@ -120,7 +121,7 @@ export async function loadInvoiceModels(supabase: SupabaseClient): Promise<Invoi
     (from, to) =>
       supabase
         .rpc("catalogue_models")
-        .select("id, code, name, category_id, price")
+        .select("id, code, name, category_id, price, image_path")
         .neq("availability", "hidden")
         .order("code")
         .range(from, to) as unknown as Rows<InvoiceModel>,

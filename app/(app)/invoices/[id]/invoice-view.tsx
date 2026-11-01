@@ -17,9 +17,11 @@ import {
   setInvoiceDate,
   updateLine,
 } from "@/app/actions/invoices";
+import { useImagePreview } from "@/components/image-preview";
 import { InvoiceSheet, plainCell } from "@/components/invoice-sheet";
 import { MoneyInput } from "@/components/money-input";
 import type { InvoiceModel } from "@/lib/invoice-data";
+import { imageUrl } from "@/lib/images";
 import { formatMoney, formatMoneyInput, parseMoney } from "@/lib/money";
 import {
   formatDateTime,
@@ -122,11 +124,22 @@ export function InvoiceView({
     });
 
   // ---- Draft editing: cells --------------------------------------------------
+  // Each model's image, for the hover preview on its lines (drafts load the
+  // models for "+ Add model" anyway).
+  const imagePaths = useMemo(() => new Map(models.map((m) => [m.id, m.image_path])), [models]);
+
   const editableCell = (line: InvoiceLine, key: string) => {
     const common = { line, onChange: replaceLine, savingRef };
     if (key === "amount") return <QuantityBox {...common} />;
     if (key === "each") return <PriceBox {...common} />;
     if (key === "item" && !line.model_id) return <DescriptionBox {...common} />;
+    if ((key === "code" || key === "item") && line.model_id) {
+      return (
+        <PreviewCell line={line} imagePath={imagePaths.get(line.model_id) ?? null}>
+          {plainCell(line, key as never)}
+        </PreviewCell>
+      );
+    }
     return plainCell(line, key as never);
   };
 
@@ -318,6 +331,26 @@ function useLineSave(line: InvoiceLine, savingRef: React.RefObject<number>, onCh
   }
 
   return { status, now, later };
+}
+
+// A model line's code or description: hovering shows the model's image
+// (the same preview as the catalogue and the builder).
+function PreviewCell({
+  line,
+  imagePath,
+  children,
+}: {
+  line: InvoiceLine;
+  imagePath: string | null;
+  children: React.ReactNode;
+}) {
+  const preview = useImagePreview(imageUrl(imagePath), `${line.code ?? ""} ${line.description}`.trim());
+  return (
+    <span className="block" {...preview.handlers}>
+      {children}
+      {preview.element}
+    </span>
+  );
 }
 
 function Mark({ status }: { status: ReturnType<typeof useLineSave>["status"] }) {
