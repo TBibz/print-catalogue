@@ -300,7 +300,7 @@ export function CatalogueView({
       {/* The sidebar column stretches to the list's full height, so the
           category list inside it can stay stuck while the list scrolls. */}
       <div className="lg:flex lg:gap-6">
-        <aside className="hidden w-40 shrink-0 lg:block">
+        <aside className="hidden w-44 shrink-0 lg:block">
           <nav
             aria-label="Categories"
             className="sticky top-[calc(var(--nav-offset)+0.5rem)] max-h-[calc(100vh-var(--nav-offset)-1rem)] overflow-y-auto border-r border-neutral-200 pr-3 transition-[top] duration-200 ease-out"

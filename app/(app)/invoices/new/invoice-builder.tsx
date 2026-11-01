@@ -14,7 +14,9 @@ import type { InvoiceModel } from "@/lib/invoice-data";
 import { formatMoney } from "@/lib/money";
 
 const ALL = "all";
-const COLUMNS = "grid-cols-[1.5rem_minmax(0,1fr)_5.5rem_4.5rem] md:grid-cols-[1.5rem_6.5rem_5rem_minmax(8rem,1fr)_6rem_5rem]";
+// Snug columns: the whole builder is at most 1000px wide (invoices/layout.tsx),
+// so Price and Qty stay close to the name. Long names are cut short with "…".
+const COLUMNS = "grid-cols-[1.25rem_minmax(0,1fr)_4.75rem_3.75rem] md:grid-cols-[1.25rem_7rem_5rem_minmax(0,1fr)_4.75rem_3.75rem]";
 
 type Row = InvoiceModel & { categoryName: string; categoryColour: string; categorySort: number };
 
@@ -108,7 +110,7 @@ export function InvoiceBuilder({
   }
 
   return (
-    <div className="pb-24">
+    <div>
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <label htmlFor="builder-search" className="sr-only">
           Search the catalogue
@@ -133,7 +135,7 @@ export function InvoiceBuilder({
       </div>
 
       <div className="lg:flex lg:gap-6">
-        <aside className="hidden w-40 shrink-0 lg:block">
+        <aside className="hidden w-44 shrink-0 lg:block">
           <nav
             aria-label="Categories"
             className="sticky top-[calc(var(--nav-offset)+0.5rem)] max-h-[calc(100vh-var(--nav-offset)-6rem)] overflow-y-auto border-r border-neutral-200 pr-3 transition-[top] duration-200 ease-out"
@@ -203,34 +205,33 @@ export function InvoiceBuilder({
               </ul>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Stays at the bottom of the screen. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-300 bg-white/95 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[96rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
-          <p className="text-lg" aria-live="polite">
-            <strong className="tabular-nums">{items}</strong> {items === 1 ? "item" : "items"} ·{" "}
-            <strong className="tabular-nums">{formatMoney(total)}</strong>
-            {noPrice > 0 && (
-              <span className="ml-2 text-sm text-amber-800">
-                ({noPrice} without a price: set it on the draft)
-              </span>
-            )}
-          </p>
-          {error && (
-            <p role="alert" className="text-sm text-red-700">
-              {error}
+          {/* Stays at the bottom of the screen while scrolling, exactly as
+              wide as the table above it. */}
+          <div className="sticky bottom-0 z-30 mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-t-lg border border-b-0 border-neutral-300 bg-white/95 px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur">
+            <p className="text-lg" aria-live="polite">
+              <strong className="tabular-nums">{items}</strong> {items === 1 ? "item" : "items"} ·{" "}
+              <strong className="tabular-nums">{formatMoney(total)}</strong>
+              {noPrice > 0 && (
+                <span className="ml-2 text-sm text-amber-800">
+                  ({noPrice} without a price: set it on the draft)
+                </span>
+              )}
             </p>
-          )}
-          <button
-            type="button"
-            onClick={generate}
-            disabled={pending || ticked.length === 0}
-            className="ml-auto rounded-md bg-neutral-900 px-6 py-3 text-base font-semibold text-white hover:bg-neutral-700 disabled:opacity-40"
-          >
-            {pending ? "Making the invoice…" : "Generate invoice"}
-          </button>
+            {error && (
+              <p role="alert" className="text-sm text-red-700">
+                {error}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={generate}
+              disabled={pending || ticked.length === 0}
+              className="ml-auto rounded-md bg-neutral-900 px-6 py-3 text-base font-semibold text-white hover:bg-neutral-700 disabled:opacity-40"
+            >
+              {pending ? "Making the invoice…" : "Generate invoice"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

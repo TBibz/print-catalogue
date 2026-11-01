@@ -28,7 +28,8 @@ export function CategoryButton({
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
       style={filled}
-      className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+      title={label}
+      className={`flex w-full items-center justify-between gap-1.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors ${
         selected
           ? colour
             ? `font-medium ${isLightColour(colour) ? "ring-1 ring-neutral-300 ring-inset" : ""}`
@@ -36,11 +37,13 @@ export function CategoryButton({
           : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
       }`}
     >
-      <span className="flex min-w-0 items-center gap-2">
+      {/* Always one line: a name too long for the sidebar ends in "…" (full
+          name on hover). */}
+      <span className="flex min-w-0 items-center gap-1.5">
         {colour && !selected && <ColourStripe hex={colour} />}
-        <span className="min-w-0 break-words">{label}</span>
+        <span className="min-w-0 truncate">{label}</span>
       </span>
-      <span className={`tabular-nums ${selected ? "opacity-70" : "text-neutral-400"}`}>{count}</span>
+      <span className={`shrink-0 tabular-nums ${selected ? "opacity-70" : "text-neutral-400"}`}>{count}</span>
     </button>
   );
 }
