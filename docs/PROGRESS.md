@@ -209,6 +209,11 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - Not used: Next.js `preferredRegion`, which Next.js 16 marks as deprecated and which on Vercel only accepts auto / global / home
 - Hobby plans allow a single function region. If Vercel refuses the deploy because of the region count, the alternative is Settings → Functions → Function Regions → London for the whole project (then delete `vercel.json`)
 
+### Invoice email attachment: Done
+- The PDF is always sent with Content-Disposition "attachment" (`lib/email.ts`), named "INV-0001 Alexanders Toy Soldiers.pdf" (`invoiceFileName()`, unchanged)
+- "The invoice is attached as a PDF." is in the default message, and `sendInvoice` adds it at the end if it's been deleted from the message
+- Checked by building the email with Nodemailer locally: attachment header and file name as above, line in the body; not yet tried with a real mail server
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
