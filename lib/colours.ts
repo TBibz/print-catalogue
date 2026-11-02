@@ -47,6 +47,12 @@ export function textColourOn(hex: string) {
   return contrastWithWhite >= contrastWithDark ? "#ffffff" : "#171717";
 }
 
+// True when a row highlight is too dark for the normal dark text to read
+// comfortably (it's allowed, but the Settings page warns).
+export function isTooDarkForRows(hex: string) {
+  return luminance(hex) < 0.45;
+}
+
 // The colour at low strength, for a light tint behind something selected.
 export const tint = (hex: string, alpha = 0.18) =>
   `${hex}${Math.round(alpha * 255).toString(16).padStart(2, "0")}`;

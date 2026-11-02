@@ -5,6 +5,7 @@ import {
   loadCategories,
   loadCategoryCounts,
   loadColourOptions,
+  loadModelPrinting,
   loadModels,
   loadPrintTotals,
   loadRequestLines,
@@ -32,15 +33,16 @@ async function CatalogueData() {
 
   let data;
   try {
-    const [categories, models, lines, printTotals, colours, categoryCounts] = await Promise.all([
+    const [categories, models, lines, printTotals, colours, categoryCounts, modelPrinting] = await Promise.all([
       loadCategories(supabase),
       loadModels(supabase),
       loadRequestLines(supabase),
       loadPrintTotals(supabase),
       loadColourOptions(supabase),
       loadCategoryCounts(supabase),
+      loadModelPrinting(supabase),
     ]);
-    data = { categories, models, lines, printTotals, colours, categoryCounts };
+    data = { categories, models, lines, printTotals, colours, categoryCounts, modelPrinting };
   } catch (error) {
     console.error("Loading the catalogue failed:", error);
     data = null;

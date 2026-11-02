@@ -112,6 +112,8 @@ The material stock index. It replaces the price table in "Centauri Prints" (cols
 
 ### settings (Phase 5)
 - Key/value. `resin_charge_divisor` = 15; `opening_balance` (£, can be negative); `money_start_month` (first day of the first month on the Money page; defaults to the month of the first completed job).
+- Colours (`colour_` keys, "#rrggbb", `0021_theme_colours.sql`): row highlights `colour_row_printing`, `colour_row_new`, `colour_row_requested`, `colour_row_alt`; headers `colour_head_catalogue`, `colour_head_queue`, `colour_head_models`, `colour_head_builder` (also the invoices list); `colour_invoice` (invoice header row and Grand Total, on screen and in the PDF); `colour_urgency_asap`, `colour_urgency_priority`. `company_` and `colour_` keys are readable by both roles; everything else, and all writing, is admin only.
+- `model_printing()`: how many of each model are on plates printing now (requested or not), readable by both roles, for the "Currently printing" highlight.
 
 ### monthly_money (Phase 7)
 One row per month, only once something has been typed in (a month without a row counts as £0).
@@ -135,9 +137,9 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 - Catalogue: category position (the order on the Categories page), then code in natural order (use `Intl.Collator('en', { numeric: true, sensitivity: 'base' })`).
 - Print queue: urgency (ASAP → PRIORITY → none), then code in natural order.
 
-**Urgency colours** (match the old sheet)
-- ASAP: dark red pill, white text
-- PRIORITY: light green pill, dark green text
+**Colours** (all set in Settings → Colours, `lib/theme.ts`; the defaults match the old sheet and earlier versions)
+- Urgency: ASAP dark red pill, PRIORITY light green pill. Text on pills and table headers switches between white and dark to suit the colour.
+- Row highlights, highest first when more than one applies: currently printing (light blue) > NEW (light gold) > requested (light green) > the alternate stripe on every other row (soft lavender). Catalogue list rows and grid cards and the Models page use all four (grid cards are white instead of striped); the queue uses currently printing (that line has some printing) and the stripe; the invoice builder and invoices list use the stripe. They're applied through CSS variables set in the app layout (`components/theme-style.tsx`), so a saved colour shows everywhere straight away.
 - none: blank
 
 **Printing quantity**
@@ -161,7 +163,7 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 **Printed total per model** = sum of `quantity_succeeded` on items in completed jobs.
 
-**NEW badge:** shown if `show_new_badge` is true and printed total < 4. NEW models' catalogue rows and grid cards also get a light gold background (over the alternating grey). It turns off automatically after 4 successful prints. Imported models start with it off unless flagged.
+**NEW badge:** shown if `show_new_badge` is true and printed total < 4. NEW models' catalogue rows and grid cards also get the "New models" highlight (light gold by default; see Colours). It turns off automatically after 4 successful prints. Imported models start with it off unless flagged.
 
 **Charges (Phase 6)**
 - Resin job: `charge` = est_weight_g ÷ resin_charge_divisor (15). `my_cost` = the `est_cost` typed in from the slicer.
@@ -170,11 +172,11 @@ The running total = `opening_balance` + the sum of every month's difference. Mon
 
 ## 6. Pages
 
-Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", "Invoices", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 96rem wide, except the invoice pages (list, builder, draft and finalised invoice), which are at most 1000px wide and centred (equal space either side; the back link, title and everything else line up with the block's left edge). The header stays at the top but slides away while scrolling down and comes back on any scroll up; the catalogue and queue column headings (dark purple, bold white) stick under it, and the catalogue's category sidebar stays in view with its own scroll. The category sidebar (catalogue and invoice builder, `components/category-nav.tsx`) is 11rem wide and keeps every category on one line; a name too long to fit ends in "…" with the full name on hover.
+Header (every page): "Print Catalogue" (the app name, links to the catalogue), "Notepad", "Invoices", then for the admin only Queue, Jobs, Money, Models, Categories, Upload, Materials, Printers, Settings (in an "Admin" drop-down below 1280px wide, where they don't fit), and Sign out on the right. The current page's link is highlighted. Pages are up to 96rem wide, except the invoice pages (list, builder, draft and finalised invoice), which are at most 1000px wide and centred (equal space either side; the back link, title and everything else line up with the block's left edge). The header stays at the top but slides away while scrolling down and comes back on any scroll up; the table column headings (catalogue, queue, models, invoice builder, invoices list; each with its own header colour, dark purple by default, bold text) stick under it, and the catalogue's category sidebar stays in view with its own scroll. The category sidebar (catalogue and invoice builder, `components/category-nav.tsx`) is 11rem wide and keeps every category on one line; a name too long to fit ends in "…" with the full name on hover.
 
 **Colours are shown one way everywhere** (`components/colour-label.tsx`): a solid 6px vertical stripe of the material's `colour_hex`, full text height with slightly rounded corners, immediately left of the colour name in normal dark text. Very light colours (worked out from the hex's luminance) get a thin grey outline. "Any colour" has no stripe. In the catalogue's colour dropdown the chosen colour's stripe sits inside the box, left of the name.
 
-Request controls (quantity, urgency, note, size, colour, plate) are all 30px high with 14px text, for spreadsheet density. Catalogue list and queue rows are one line where possible, vertically centred, with about 4px padding, and alternate white / soft lavender grey (#f3f1f8). Long names are cut short with "…" (full name on hover). Hover tooltips everywhere use the app's own tooltip (`components/tooltips.tsx`, elements opt in with `data-tip="…"`), not the browser's `title`: it appears just below (or above) the hovered item after a short pause and disappears when the mouse leaves, the page scrolls or anything is clicked or typed. Another size or colour is added with a small "+" right of the size or colour dropdown (tooltip "Add another size/colour").
+Request controls (quantity, urgency, note, size, colour, plate) are all 30px high with 14px text, for spreadsheet density. Catalogue list and queue rows are one line where possible, vertically centred, with about 4px padding, and alternate white / the alternate-row colour (soft lavender by default), with the row highlights above (see Colours). Long names are cut short with "…" (full name on hover). Hover tooltips everywhere use the app's own tooltip (`components/tooltips.tsx`, elements opt in with `data-tip="…"`), not the browser's `title`: it appears just below (or above) the hovered item after a short pause and disappears when the mouse leaves, the page scrolls or anything is clicked or typed. Another size or colour is added with a small "+" right of the size or colour dropdown (tooltip "Add another size/colour").
 
 Everyone:
 - `/invoices`, `/invoices/new`, `/invoices/[id]` and `/invoices/[id]/pdf`: see Phase 9 below.
@@ -192,7 +194,7 @@ Admin only:
 - `/admin/materials`: each material shows its colour stripe; adding or editing uses a native colour picker for `colour_hex`.
 - `/admin/materials`, `/admin/printers` (each printer has a colour picker)
 - `/admin/money` ("Money" in the header): the running total at the top, large, red if negative, green if positive, grey at zero. A "Starting balance" section (opening balance and first month shown, saved to settings). A table, newest month first: Month ("Oct 2026"), Print jobs ("12 plates · 47 items"), Charge, Payments, Costs, Difference. Payments and Costs are £ boxes that autosave ("Saved ✓"), with "Materials from jobs: £x.xx" in grey under Costs. Difference is coloured like the total. Below: all-time stats (plates and items per printer, total charge, top 10 most printed models).
-- `/admin/settings`: the resin charge divisor and the company details printed on invoices (`company_` settings).
+- `/admin/settings`: the resin charge divisor and the company details printed on invoices (`company_` settings), Email (Send test email), and Colours: Row highlights (Currently printing, New models, Requested, Alternate rows), Header colours (Catalogue, Queue, Models, Invoice builder, Invoice document) and Urgency (ASAP, PRIORITY), each with the shared colour picker, a live preview, Save and "Reset to default". A row colour too dark for dark text shows a warning (but is allowed).
 
 ## 7. Phases
 

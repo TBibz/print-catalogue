@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/data";
 import { emailServerSummary } from "@/lib/email";
+import { ColourSettings } from "./colour-settings";
 import { SettingsForm } from "./settings-form";
 import { TestEmail } from "./test-email";
 
@@ -34,10 +35,12 @@ async function SettingsData() {
       </p>
     );
   }
+  const values = Object.fromEntries(settings.map((s) => [s.key, s.value]));
   return (
     <>
-      <SettingsForm values={Object.fromEntries(settings.map((s) => [s.key, s.value]))} />
+      <SettingsForm values={values} />
       <TestEmail server={emailServerSummary()} />
+      <ColourSettings values={values} />
     </>
   );
 }

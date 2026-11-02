@@ -4,6 +4,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { InvoiceDocument } from "@/lib/invoice-pdf-document";
 import type { Company, Invoice, InvoiceLine } from "@/lib/invoices";
 
-export async function renderInvoicePdf(invoice: Invoice, lines: InvoiceLine[], company: Company) {
-  return renderToBuffer(<InvoiceDocument invoice={invoice} lines={lines} company={company} />);
+// accent: the "Invoice document" colour from Settings → Colours.
+export async function renderInvoicePdf(invoice: Invoice, lines: InvoiceLine[], company: Company, accent: string) {
+  return renderToBuffer(<InvoiceDocument invoice={invoice} lines={lines} company={company} accent={accent} />);
 }

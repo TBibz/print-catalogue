@@ -17,6 +17,7 @@ import { DEFAULT_RESIN_DIVISOR, JOB_COLUMNS, type Job, type JobFormOptions } fro
 import { MATERIAL_COLUMNS, PRINTER_COLUMNS, type Material, type Printer } from "@/lib/materials";
 import { NOTE_LINE_COLUMNS, type NoteLine } from "@/lib/notepad";
 import { fetchAll } from "@/lib/fetch-all";
+import { DEFAULT_THEME, themeFrom, type Theme } from "@/lib/theme";
 
 // Server-side data loading shared by the pages.
 // Every query runs as the logged-in user, so RLS applies.
@@ -169,6 +170,41 @@ export async function loadMaterials(supabase: SupabaseClient) {
       .range(from, to)
       .returns<Material[]>(),
   );
+}
+
+// The colours from Settings → Colours (0021). Readable by both roles. If
+// they can't be read, the defaults are used rather than breaking the page.
+export async function loadTheme(supabase: SupabaseClient): Promise<Theme> {
+  try {
+    const rows = await fetchAll<{ key: string; value: string }>((from, to) =>
+      supabase
+        .from("settings")
+        .select("key, value")
+        .like("key", "colour\\_%")
+        .order("key")
+        .range(from, to)
+        .returns<{ key: string; value: string }[]>(),
+    );
+    return themeFrom(Object.fromEntries(rows.map((r) => [r.key, r.value])));
+  } catch (error) {
+    console.error("Loading the colours failed:", error);
+    return DEFAULT_THEME;
+  }
+}
+
+// How many of each model are on plates printing right now ({ model id:
+// number }), requested or not (model_printing() in 0021), for the
+// "Currently printing" row highlight.
+export async function loadModelPrinting(supabase: SupabaseClient) {
+  const rows = await fetchAll<{ model_id: string; printing: number }>(
+    (from, to) =>
+      supabase
+        .rpc("model_printing")
+        .select("model_id, printing")
+        .order("model_id")
+        .range(from, to) as unknown as Rows<{ model_id: string; printing: number }>,
+  );
+  return Object.fromEntries(rows.map((r) => [r.model_id, r.printing])) as Record<string, number>;
 }
 
 export async function loadSettings(supabase: SupabaseClient) {

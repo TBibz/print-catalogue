@@ -26,11 +26,9 @@ export const COLOURS = {
   text: "#171717",
   muted: "#525252",
   line: "#d4d4d4",
-  headerBg: "#3b2a5c", // the app's dark purple
-  headerText: "#ffffff",
+  // The header row and Grand Total box use the "Invoice document" colour
+  // from Settings → Colours (lib/theme.ts), not a fixed colour.
   zebra: "#f3f1f8", // the app's soft lavender
-  totalBg: "#3b2a5c",
-  totalText: "#ffffff",
   watermark: "#9ca3af",
 };
 

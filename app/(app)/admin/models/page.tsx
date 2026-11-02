@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { loadAdminModels, loadCategories, loadPrintTotals, loadRequestLines } from "@/lib/data";
+import { loadAdminModels, loadCategories, loadModelPrinting, loadPrintTotals, loadRequestLines } from "@/lib/data";
 import { ModelsList } from "./models-list";
 
 export const metadata: Metadata = { title: "Models · Print Catalogue" };
@@ -30,18 +30,19 @@ async function ModelsData() {
 
   let data = null;
   try {
-    const [categories, models, lines, printTotals] = await Promise.all([
+    const [categories, models, lines, printTotals, modelPrinting] = await Promise.all([
       loadCategories(supabase),
       loadAdminModels(supabase),
       loadRequestLines(supabase),
       loadPrintTotals(supabase),
+      loadModelPrinting(supabase),
     ]);
     // How many open request lines each model has (shown when deleting).
     const requestCounts: Record<string, number> = {};
     for (const line of lines) {
       requestCounts[line.model_id] = (requestCounts[line.model_id] ?? 0) + 1;
     }
-    data = { categories, models, requestCounts, printTotals };
+    data = { categories, models, requestCounts, printTotals, modelPrinting };
   } catch (error) {
     console.error("Loading models failed:", error);
   }

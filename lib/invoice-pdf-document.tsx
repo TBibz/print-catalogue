@@ -6,6 +6,7 @@
 // every page says "Page X of Y" at the bottom.
 import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { COLOURS, COLUMNS, FONT, PAGE, ROW, type ColumnKey } from "@/lib/invoice-layout";
+import { textColourOn } from "@/lib/colours";
 import { formatMoney } from "@/lib/money";
 import {
   formatInvoiceDate,
@@ -35,8 +36,6 @@ const s = StyleSheet.create({
   label: { fontSize: FONT.label, color: COLOURS.muted, letterSpacing: 0.6, marginBottom: 3 },
   value: { fontFamily: "Helvetica-Bold", fontSize: FONT.value },
   totalBox: {
-    backgroundColor: COLOURS.totalBg,
-    color: COLOURS.totalText,
     paddingVertical: 8,
     paddingHorizontal: 14,
     alignItems: "flex-end",
@@ -45,7 +44,7 @@ const s = StyleSheet.create({
   totalLabel: { fontSize: FONT.totalLabel, letterSpacing: 0.8, marginBottom: 2 },
   totalValue: { fontFamily: "Helvetica-Bold", fontSize: FONT.total },
   table: { marginTop: 24 },
-  headRow: { flexDirection: "row", backgroundColor: COLOURS.headerBg, color: COLOURS.headerText },
+  headRow: { flexDirection: "row" },
   headCell: {
     fontFamily: "Helvetica-Bold",
     fontSize: FONT.label,
@@ -103,11 +102,16 @@ export function InvoiceDocument({
   invoice,
   lines,
   company,
+  accent,
 }: {
   invoice: Invoice;
   lines: InvoiceLine[];
   company: Company;
+  accent: string; // the "Invoice document" colour (Settings → Colours), "#rrggbb"
 }) {
+  // The header row and Grand Total box: the chosen colour, with white or
+  // dark text, whichever reads better on it.
+  const accentStyle = { backgroundColor: accent, color: textColourOn(accent) };
   const draft = invoice.status !== "finalised";
   const { total } = linesTotals(lines);
   return (
@@ -138,7 +142,7 @@ export function InvoiceDocument({
             </View>
             {/* A "Bill to" block can go here later. */}
           </View>
-          <View style={s.totalBox}>
+          <View style={[s.totalBox, accentStyle]}>
             <Text style={s.totalLabel}>GRAND TOTAL</Text>
             <Text style={s.totalValue}>{formatMoney(total)}</Text>
           </View>
@@ -146,7 +150,7 @@ export function InvoiceDocument({
 
         <View style={s.table}>
           {/* `fixed`: repeated at the top of every page the table flows onto. */}
-          <View style={s.headRow} fixed>
+          <View style={[s.headRow, accentStyle]} fixed>
             {COLUMNS.map((c) => (
               <Text key={c.key} style={[s.headCell, colStyle(c.key)]}>
                 {c.label}

@@ -11,7 +11,8 @@ import {
 } from "@/components/request-fields";
 import type { JobFormOptions } from "@/lib/jobs";
 import { ColourLabel } from "@/components/colour-label";
-import { STICKY_HEADINGS } from "@/components/sticky-headings";
+import { stickyHeadings } from "@/components/sticky-headings";
+import { rowHighlight } from "@/lib/row-highlights";
 import { StartPrintPanel, type PickableModel } from "./start-print-panel";
 
 export type QueueRow = {
@@ -133,7 +134,7 @@ export function QueueView({
       ) : (
         <div className="border-t border-neutral-200">
           <div
-            className={`${STICKY_HEADINGS} hidden gap-3 px-3 py-2 lg:grid ${COLUMNS}`}
+            className={`${stickyHeadings("queue")} hidden gap-3 px-3 py-2 lg:grid ${COLUMNS}`}
           >
             {/* An empty cell over the tick boxes, so every heading sits over
                 its own column. (A visually hidden cell takes no space.) */}
@@ -212,7 +213,7 @@ function QueueLine({
 
   return (
     <li
-      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-1.5 border-b border-neutral-100 px-3 py-1.5 text-sm even:bg-[#f3f1f8] lg:gap-x-3 lg:py-1 ${COLUMNS}`}
+      className={`grid grid-cols-[4.5rem_8rem_minmax(0,1fr)] items-center gap-1.5 border-b border-neutral-100 px-3 py-1.5 text-sm ${rowHighlight({ printing: row.line.printing > 0 })} lg:gap-x-3 lg:py-1 ${COLUMNS}`}
     >
       {/* Phone: code, name, category and size on one block above the controls */}
       <div className="col-span-3 lg:contents">

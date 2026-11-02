@@ -7,6 +7,7 @@ import { refresh } from "next/cache";
 import { getCurrentProfile } from "@/lib/auth";
 import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { loadCompany, loadInvoice, loadInvoiceLines } from "@/lib/invoice-data";
+import { loadTheme } from "@/lib/data";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
 import {
   CUSTOMER_COLUMNS,
@@ -268,15 +269,16 @@ export async function sendInvoice(
   const subject = input.subject.trim();
   if (!subject) return { ok: false, error: "The subject can't be empty." };
 
-  const [invoice, lines, company] = await Promise.all([
+  const [invoice, lines, company, theme] = await Promise.all([
     loadInvoice(supabase, id),
     loadInvoiceLines(supabase, id),
     loadCompany(supabase),
+    loadTheme(supabase),
   ]);
   if (!invoice) return { ok: false, error: "That invoice no longer exists." };
   if (invoice.status !== "finalised") return { ok: false, error: "Finalise the invoice before sending it." };
 
-  const pdf = await renderInvoicePdf(invoice, lines, company);
+  const pdf = await renderInvoicePdf(invoice, lines, company, theme.colour_invoice);
   const sent = await sendEmail({
     fromName: company.name,
     replyTo: company.email,

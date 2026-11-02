@@ -13,9 +13,10 @@ import { imageUrl } from "@/lib/images";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import { useLineAutosave } from "@/lib/use-line-autosave";
 import { ANY_COLOUR, colourName, type ColourOption } from "@/lib/colours";
-import { STICKY_HEADINGS } from "@/components/sticky-headings";
+import { stickyHeadings } from "@/components/sticky-headings";
 import { CategoryButton, CategoryTag } from "@/components/category-nav";
 import { useImagePreview } from "@/components/image-preview";
+import { cardHighlight, rowHighlight } from "@/lib/row-highlights";
 import type { CategoryCounts } from "@/lib/data";
 import {
   AddLineButton,
@@ -33,6 +34,7 @@ type Row = CatalogueModel & {
   categorySort: number;
   hasColours: boolean; // the category offers colour choices (e.g. BASES)
   printedTotal: number;
+  printing: number; // how many are on plates printing right now
 };
 
 // One set of request controls under a model. A model normally has one slot;
@@ -108,6 +110,7 @@ export function CatalogueView({
   models,
   lines,
   printTotals,
+  modelPrinting,
   colours,
   categoryCounts,
 }: {
@@ -116,6 +119,8 @@ export function CatalogueView({
   lines: RequestLine[];
   // Successful prints per model, for the NEW badge.
   printTotals: Record<string, number>;
+  // How many of each model are on printing plates (row highlight).
+  modelPrinting: Record<string, number>;
   // Colours the colour dropdown can show (e.g. for BASES).
   colours: ColourOption[];
   // Models per category, counted in the database.
@@ -155,9 +160,10 @@ export function CatalogueView({
         categorySort: byId.get(m.category_id)?.sort_order ?? 0,
         hasColours: byId.get(m.category_id)?.has_colour_options ?? false,
         printedTotal: printTotals[m.id] ?? 0,
+        printing: modelPrinting[m.id] ?? 0,
       }))
       .sort(compareModels);
-  }, [categories, models, printTotals]);
+  }, [categories, models, printTotals, modelPrinting]);
 
   // How many models each category shows, counted in the database
   // (category_model_counts), so it's right however many models there are.
@@ -386,7 +392,7 @@ export function CatalogueView({
         <div className="border-t border-neutral-200">
           {/* Column headings (laptop/desktop only), sticky while scrolling */}
           <div
-            className={`${STICKY_HEADINGS} hidden gap-x-3 px-3 py-2 xl:grid ${
+            className={`${stickyHeadings("catalogue")} hidden gap-x-3 px-3 py-2 xl:grid ${
               OUTER[outerKey(showCategory, colourHeader)]
             }`}
           >
@@ -447,7 +453,6 @@ type ImageProps = { onOpenImage: (model: Row) => void };
 
 
 // Every other list row: a soft lavender grey, visible but subtle.
-const ALT_ROW = "even:bg-[#f3f1f8]";
 
 // List row columns from xl: code, name (never squeezed below 8rem), the
 // category tag (on "All" only), then the controls. Lists with a Colour
@@ -468,9 +473,9 @@ const XL_OUTER: Record<string, string> = {
 const outerKey = (showCategory: boolean, colourColumn: boolean) =>
   `${showCategory ? 1 : 0}${colourColumn ? 1 : 0}`;
 
-// Light gold for NEW models' rows and cards (takes priority over the
-// alternating grey).
-const NEW_ROW = "bg-amber-100/70";
+
+// Someone has asked for this model (it has an open request line).
+const isRequested = (slots: Slot[] | undefined) => Boolean(slots?.some((s) => s.line !== null));
 
 // memo: a row only re-renders when its own slots change, which keeps
 // typing smooth with hundreds of rows on screen.
@@ -498,12 +503,12 @@ const ModelRow = memo(function ModelRow({
 
   return (
     // One line per model where possible, everything on the same centre line.
-    // Every other row has a soft lavender-grey background, like a
-    // spreadsheet; NEW models get a light gold row instead, like the old sheet.
+    // Row colour (Settings → Colours): currently printing > NEW > requested >
+    // a soft stripe on every other row, like a spreadsheet.
     <li
       className={`grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1 border-b border-neutral-100 px-3 py-1.5 xl:py-1 ${
         XL_OUTER[outerKey(showCategory, callbacks.colourColumn)]
-      } ${isNew ? NEW_ROW : ALT_ROW}`}
+      } ${rowHighlight({ printing: model.printing > 0, isNew, requested: isRequested(slots) })}`}
     >
       {/* Coming-soon models are greyed out, but the controls stay normal. */}
       <span
@@ -568,9 +573,11 @@ const ModelCard = memo(function ModelCard({
 
   return (
     <li
-      className={`flex flex-col rounded-lg border ${
-        showNewBadge(model, model.printedTotal) ? `border-amber-200 ${NEW_ROW}` : "border-neutral-200 bg-white"
-      }`}
+      className={`flex flex-col rounded-lg border border-neutral-200 ${cardHighlight({
+        printing: model.printing > 0,
+        isNew: showNewBadge(model, model.printedTotal),
+        requested: isRequested(slots),
+      })}`}
     >
       <div className="flex aspect-square items-center justify-center overflow-hidden rounded-t-lg border-b border-neutral-100 bg-white">
         {url ? (

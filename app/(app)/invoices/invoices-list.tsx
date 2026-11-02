@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteDraft } from "@/app/actions/invoices";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { MarkSentPanel } from "@/components/mark-sent-panel";
-import { STICKY_HEADINGS } from "@/components/sticky-headings";
+import { stickyHeadings } from "@/components/sticky-headings";
+import { ROW_ALT } from "@/lib/row-highlights";
 import { formatMoney } from "@/lib/money";
 import { formatInvoiceDate, invoiceSendState, type InvoiceListRow, type InvoiceSendState } from "@/lib/invoices";
 
@@ -105,7 +106,7 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
           {message.text}
         </p>
       )}
-      <div className={`${STICKY_HEADINGS} hidden gap-x-3 px-3 py-2 md:grid ${COLUMNS}`}>
+      <div className={`${stickyHeadings("builder")} hidden gap-x-3 px-3 py-2 md:grid ${COLUMNS}`}>
         <span>Number</span>
         <span>Date</span>
         <span className="text-right">Items</span>
@@ -121,7 +122,7 @@ export function InvoicesList({ invoices: serverInvoices }: { invoices: InvoiceLi
           return (
             <li
               key={inv.id}
-              className={`grid grid-cols-2 items-center gap-x-3 gap-y-1 border-b border-neutral-100 px-3 py-2 text-sm even:bg-[#f3f1f8] ${COLUMNS}`}
+              className={`grid grid-cols-2 items-center gap-x-3 gap-y-1 border-b border-neutral-100 px-3 py-2 text-sm ${ROW_ALT} ${COLUMNS}`}
             >
               <Link href={`/invoices/${inv.id}`} className="font-mono font-medium hover:underline">
                 {inv.number ?? "Draft"}

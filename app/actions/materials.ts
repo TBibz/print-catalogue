@@ -2,6 +2,7 @@
 
 // Printers, materials and settings (admin only: RLS allows only the admin,
 // and requireAdmin() checks first for a clear message).
+import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -14,6 +15,7 @@ import {
   type Printer,
 } from "@/lib/materials";
 import { parseMoney } from "@/lib/money";
+import { isHexColour, isThemeKey } from "@/lib/theme";
 
 type Fail = { ok: false; error: string; field?: string };
 const TYPES: MaterialType[] = ["resin", "fdm"];
@@ -173,9 +175,11 @@ export async function deleteMaterial(id: string): Promise<{ ok: true } | Fail> {
 
 export async function saveSetting(key: string, value: string): Promise<{ ok: true } | Fail> {
   await requireAdmin();
-  if (!SETTINGS.some((s) => s.key === key)) return { ok: false, error: "Unknown setting." };
+  const colour = isThemeKey(key);
+  if (!colour && !SETTINGS.some((s) => s.key === key)) return { ok: false, error: "Unknown setting." };
 
   const trimmed = String(value ?? "").trim();
+  if (colour && !isHexColour(trimmed)) return { ok: false, error: "Choose a colour." };
   if (key.startsWith("company_")) {
     if (trimmed.length > 200) return { ok: false, error: "That's too long (200 characters at most)." };
     if (key === "company_name" && !trimmed) return { ok: false, error: "The company name can't be empty." };
@@ -191,5 +195,7 @@ export async function saveSetting(key: string, value: string): Promise<{ ok: tru
   const supabase = await createClient();
   const { error } = await supabase.from("settings").upsert({ key, value: trimmed });
   if (error) return friendly(error, "setting");
+  // A new colour shows across the app straight away (the layout reloads it).
+  if (colour) refresh();
   return { ok: true };
 }

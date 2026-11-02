@@ -111,8 +111,9 @@ export function InvoiceSheet({
           <div
             className="text-right"
             style={{
-              background: COLOURS.totalBg,
-              color: COLOURS.totalText,
+              // The "Invoice document" colour (Settings → Colours).
+              background: "var(--colour-invoice)",
+              color: "var(--colour-invoice-text)",
               padding: `${pt(8)} ${pt(14)}`,
               minWidth: pt(150),
             }}
@@ -132,7 +133,7 @@ export function InvoiceSheet({
             {rowAction && <col style={{ width: pt(26) }} />}
           </colgroup>
           <thead>
-            <tr style={{ background: COLOURS.headerBg, color: COLOURS.headerText }}>
+            <tr style={{ background: "var(--colour-invoice)", color: "var(--colour-invoice-text)" }}>
               {COLUMNS.map((c) => (
                 <th
                   key={c.key}

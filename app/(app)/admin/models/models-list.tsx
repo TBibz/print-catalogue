@@ -16,12 +16,11 @@ import {
 } from "@/lib/catalogue";
 import { ModelEditor, MODEL_COLUMNS } from "./model-editor";
 import { PriceCell } from "./price-cell";
-import { STICKY_HEADINGS } from "@/components/sticky-headings";
+import { stickyHeadings } from "@/components/sticky-headings";
+import { rowHighlight } from "@/lib/row-highlights";
 
 // Row colours, the same as the catalogue: every other row soft lavender
 // grey, NEW models light gold (which wins).
-const ALT_ROW = "even:bg-[#f3f1f8]";
-const NEW_ROW = "bg-amber-100/70";
 
 type Filter = "all" | Availability;
 
@@ -46,12 +45,14 @@ export function ModelsList({
   models: serverModels,
   requestCounts,
   printTotals,
+  modelPrinting,
 }: {
   categories: Category[];
   models: AdminModel[];
   requestCounts: Record<string, number>;
   // Successful prints per model (completed jobs).
   printTotals: Record<string, number>;
+  modelPrinting: Record<string, number>; // how many are on printing plates
 }) {
   const [models, setModels] = useState(serverModels);
   const [query, setQuery] = useState("");
@@ -330,7 +331,7 @@ export function ModelsList({
 
       <div className="border-t border-neutral-200">
         {/* Same headings as the catalogue: dark purple, sticky under the header. */}
-        <div className={`${STICKY_HEADINGS} hidden items-center gap-x-3 px-3 py-2 md:grid ${MODEL_COLUMNS}`}>
+        <div className={`${stickyHeadings("models")} hidden items-center gap-x-3 px-3 py-2 md:grid ${MODEL_COLUMNS}`}>
           <span className="flex">
             <input
               type="checkbox"
@@ -372,7 +373,11 @@ export function ModelsList({
               <li
                 key={m.id}
                 className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-neutral-100 px-3 py-1 text-sm ${MODEL_COLUMNS} ${
-                  isNew ? NEW_ROW : ALT_ROW
+                  rowHighlight({
+                    printing: (modelPrinting[m.id] ?? 0) > 0,
+                    isNew,
+                    requested: (requestCounts[m.id] ?? 0) > 0,
+                  })
                 }`}
               >
                 <span className="hidden md:flex">

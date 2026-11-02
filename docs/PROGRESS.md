@@ -231,6 +231,13 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - Invoices list: "Mark as sent…" on each row in the Not sent view, opening the same panel under the row; columns rebalanced so the longer badge and the extra button fit
 - Checked in PGlite: marking (including by the requester), refusing a future date / a draft / a second mark, unmark only for manual, reopen blocked while marked and allowed after undo, logged-out refused, safe to run twice. UI checked with sample invoices in the browser pane (temporary preview page, not committed)
 
+### Customisable colours: Done (needs `0021` run)
+- `0021_theme_colours.sql`: 11 `colour_` settings with the old colours as defaults (two new row highlights: printing light blue `#dbeafe`, requested light green `#e3f5e8`); the settings read policy also lets both roles read `colour_` keys; `model_printing()` (requested or not, printing plates only). Checked in PGlite: Dad reads the colours but no other admin settings and can't change them, re-running keeps a chosen colour, printing counts right
+- `lib/theme.ts` (the list, defaults, CSS); `components/theme-style.tsx` in the app layout writes them as CSS variables (defaults until loaded; falls back to defaults if they can't be read); text colour on headers / pills / invoice from `textColourOn()`
+- Applied: `stickyHeadings(table)` (catalogue, queue, models, builder; the invoices list uses the builder colour), `lib/row-highlights.ts` (`rowHighlight()` printing > new > requested > stripe; `cardHighlight()` for grid cards), urgency pills (`URGENCY_STYLES`), invoice sheet (CSS variables) and PDF (`renderInvoicePdf(…, accent)`, read with `loadTheme()` in the PDF route and when sending)
+- Settings → Colours: picker, live preview, Save, Reset to default; a warning under row colours that are too dark (luminance below 0.45). Saving a colour refreshes the app
+- Checked in the browser pane with a temporary preview page (not committed): defaults identical to before, priority order right, pill and header text switch to dark on light colours, the warning shows. Not checked logged in (Claude can't log in)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -257,6 +264,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0018_urgency_prices.sql` | 8+ | URGENT → ASAP and removed; `models.price`; `catalogue_models()` with price; `set_models_price()`, `set_category_price()` | ☐ |
 | `0019_invoices.sql` | 9 | customers, invoices, invoice lines, numbering counter, `invoice_totals`, invoice functions, company settings readable by both roles | ☐ |
 | `0020_mark_invoice_sent.sql` | 9 | `invoices.sent_method` (existing sent ones become `email`), `mark_invoice_sent_manually()`, `unmark_invoice_sent()`; `mark_invoice_sent()` records `email` | ☐ |
+| `0021_theme_colours.sql` | 9 | colour_ settings with defaults, readable by both roles; `model_printing()` | ☐ |
 
 Also in `supabase/snippets/` (run by hand, never automatically):
 - `make-admin.sql` (one-off, makes your account admin)

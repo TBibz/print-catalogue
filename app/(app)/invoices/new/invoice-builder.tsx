@@ -8,7 +8,8 @@ import { memo, useCallback, useMemo, useState, useTransition } from "react";
 import { createInvoice } from "@/app/actions/invoices";
 import { CategoryButton, CategoryTag } from "@/components/category-nav";
 import { useImagePreview } from "@/components/image-preview";
-import { STICKY_HEADINGS } from "@/components/sticky-headings";
+import { stickyHeadings } from "@/components/sticky-headings";
+import { ROW_ALT } from "@/lib/row-highlights";
 import { compareCategories, compareModels, type Category } from "@/lib/catalogue";
 import type { CategoryCounts } from "@/lib/data";
 import type { InvoiceModel } from "@/lib/invoice-data";
@@ -192,7 +193,7 @@ export function InvoiceBuilder({
             </p>
           ) : (
             <div className="border-t border-neutral-200">
-              <div className={`${STICKY_HEADINGS} grid items-center gap-x-3 px-3 py-2 ${COLUMNS}`}>
+              <div className={`${stickyHeadings("builder")} grid items-center gap-x-3 px-3 py-2 ${COLUMNS}`}>
                 <span />
                 <span className="hidden md:block">Category</span>
                 <span className="hidden md:block">Code</span>
@@ -259,7 +260,7 @@ const BuilderRow = memo(function BuilderRow({
   return (
     <li
       className={`grid items-center gap-x-3 border-b border-neutral-100 px-3 py-1 text-sm ${COLUMNS} ${
-        ticked ? "bg-green-50" : "even:bg-[#f3f1f8]"
+        ticked ? "bg-green-50" : ROW_ALT
       }`}
     >
       <input

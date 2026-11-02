@@ -32,10 +32,12 @@ export type RequestLine = RequestLineRow & {
 export const REQUEST_LINE_COLUMNS =
   "id, model_id, scale, colour_material_id, quantity, urgency, note, created_at, updated_at";
 
-// Pill colours, matching the old sheet (brief section 5).
+// Pill colours from Settings → Colours (lib/theme.ts), text white or dark to
+// suit. Written out in full so Tailwind finds the classes.
 export const URGENCY_STYLES: Record<Urgency | "none", string> = {
-  ASAP: "bg-red-800 text-white border-red-800",
-  PRIORITY: "bg-green-100 text-green-800 border-green-200",
+  ASAP: "bg-[var(--colour-urgency-asap)] text-[var(--colour-urgency-asap-text)] border-[var(--colour-urgency-asap)]",
+  PRIORITY:
+    "bg-[var(--colour-urgency-priority)] text-[var(--colour-urgency-priority-text)] border-[var(--colour-urgency-priority)]",
   none: "bg-white text-neutral-500 border-neutral-300",
 };
 
