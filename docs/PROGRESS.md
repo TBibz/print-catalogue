@@ -247,6 +247,11 @@ _Last updated: 2026-11-04 (notepad lines and undo, Reports, Setup menu)_
 - Removed: the old Money page's stats loaders (`loadPrinterStats`, `loadTopModels`) and their types
 - Checked with sample data in the browser pane (temporary preview page, not committed): chart, cards, table (heading directly above the first row and sticky), stats, nav and Setup menu, ruled notepad; the redirect checked on the dev server. Not checked logged in
 
+### Starting balance moved to Settings: Done (no SQL)
+- Reports → Money no longer has the Starting balance card; under the running total a grey line "Includes opening balance of £x.xx · Edit in Settings" links to `/admin/settings#money`
+- Settings → Money (`app/(app)/admin/settings/money-settings.tsx`): the same opening balance and first month fields and Save, using the same `saveMoneySettings` action. The stored settings and the running total / monthly calculations are untouched
+- Checked: the running-total line of code is identical before and after, and the old and new Money tabs rendered with the same sample data both show −£68.24 (temporary preview page, not committed)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.

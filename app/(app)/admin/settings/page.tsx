@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { loadSettings } from "@/lib/data";
+import { loadMoneySettings, loadSettings } from "@/lib/data";
 import { emailServerSummary } from "@/lib/email";
 import { ColourSettings } from "./colour-settings";
+import { MoneySettingsForm } from "./money-settings";
 import { SettingsForm } from "./settings-form";
 import { TestEmail } from "./test-email";
 
@@ -24,9 +25,9 @@ export default function SettingsPage() {
 async function SettingsData() {
   await requireAdmin();
   const supabase = await createClient();
-  let settings;
+  let settings, money;
   try {
-    settings = await loadSettings(supabase);
+    [settings, money] = await Promise.all([loadSettings(supabase), loadMoneySettings(supabase)]);
   } catch (error) {
     console.error("Loading settings failed:", error);
     return (
@@ -39,6 +40,8 @@ async function SettingsData() {
   return (
     <>
       <SettingsForm values={values} />
+      {/* key: start again from the saved values after each save. */}
+      <MoneySettingsForm key={`${money.openingBalance}|${money.startMonth}`} settings={money} />
       <TestEmail server={emailServerSummary()} />
       <ColourSettings values={values} />
     </>

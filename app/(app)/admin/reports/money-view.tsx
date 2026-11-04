@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { saveMoneySettings, saveMonthlyMoney } from "@/app/actions/money";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { saveMonthlyMoney } from "@/app/actions/money";
 import { MoneyInput } from "@/components/money-input";
 import { formatMoney, formatMoneyInput, moneyTone, parseMoney, toPence } from "@/lib/money";
 import { monthLabel, type MoneyMonth, type MoneySettings } from "@/lib/money-data";
@@ -41,13 +42,14 @@ export function MoneyView({ months: serverMonths, settings }: { months: MoneyMon
           Running total
         </h2>
         <p className={`mt-1 text-4xl font-semibold tabular-nums ${moneyTone(total)}`}>{formatMoney(total)}</p>
-        <p className="mt-1 text-sm text-neutral-600">
-          Opening balance {formatMoney(settings.openingBalance)} plus every month’s difference (payments minus
-          charges and costs).
+        {/* The opening balance and first month are set in Settings → Money. */}
+        <p className="mt-1 text-sm text-neutral-500">
+          Includes opening balance of {formatMoney(settings.openingBalance)} ·{" "}
+          <Link href="/admin/settings#money" className="underline hover:no-underline">
+            Edit in Settings
+          </Link>
         </p>
       </section>
-
-      <StartingBalance key={`${settings.openingBalance}|${settings.startMonth}`} settings={settings} />
 
       <section aria-labelledby="months-heading">
         <h2 id="months-heading" className="mb-3 text-lg font-semibold">
@@ -55,7 +57,11 @@ export function MoneyView({ months: serverMonths, settings }: { months: MoneyMon
         </h2>
         {months.length === 0 ? (
           <p className="py-8 text-center text-neutral-500">
-            The start month is in the future. Change it under Starting balance.
+            The first month shown is in the future. Change it in{" "}
+            <Link href="/admin/settings#money" className="underline hover:no-underline">
+              Settings → Money
+            </Link>
+            .
           </p>
         ) : (
           <div className="border-t border-neutral-200">
@@ -78,76 +84,6 @@ export function MoneyView({ months: serverMonths, settings }: { months: MoneyMon
         )}
       </section>
     </div>
-  );
-}
-
-// ---- Starting balance --------------------------------------------------------
-
-function StartingBalance({ settings }: { settings: MoneySettings }) {
-  const [opening, setOpening] = useState(formatMoneyInput(settings.openingBalance));
-  const [startMonth, setStartMonth] = useState(settings.startMonth.slice(0, 7)); // "2026-07"
-  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const dirty =
-    parseMoney(opening, { allowNegative: true }) !== settings.openingBalance ||
-    startMonth !== settings.startMonth.slice(0, 7);
-
-  function save() {
-    setStatus(null);
-    startTransition(async () => {
-      const result = await saveMoneySettings(opening, startMonth);
-      setStatus(result.ok ? { ok: true, text: "Saved ✓" } : { ok: false, text: result.error });
-    });
-  }
-
-  return (
-    <section aria-labelledby="starting-heading" className="rounded-lg border border-neutral-200 p-4">
-      <h2 id="starting-heading" className="mb-1 font-semibold">
-        Starting balance
-      </h2>
-      <p className="mb-3 text-sm text-neutral-600">
-        The balance before the first month below. Type a minus for a negative amount, e.g. -42.50.
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          save();
-        }}
-        className="flex flex-wrap items-end gap-4"
-      >
-        <div>
-          <label htmlFor="opening-balance" className="mb-1 block text-sm text-neutral-700">
-            Opening balance
-          </label>
-          <MoneyInput id="opening-balance" value={opening} onChange={setOpening} allowNegative className="w-40" />
-        </div>
-        <div>
-          <label htmlFor="start-month" className="mb-1 block text-sm text-neutral-700">
-            First month shown
-          </label>
-          <input
-            id="start-month"
-            type="month"
-            value={startMonth}
-            onChange={(e) => setStartMonth(e.target.value)}
-            className="h-11 rounded-md border border-neutral-300 bg-white px-2.5 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={pending || !dirty}
-          className="h-11 rounded-md bg-neutral-900 px-4 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-30"
-        >
-          {pending ? "Saving…" : "Save"}
-        </button>
-        {status && (
-          <span role={status.ok ? "status" : "alert"} className={`pb-3 text-sm ${status.ok ? "text-green-700" : "text-red-700"}`}>
-            {status.text}
-          </span>
-        )}
-      </form>
-    </section>
   );
 }
 
