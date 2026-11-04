@@ -38,3 +38,16 @@ function safeHref(link: string) {
     return null;
   }
 }
+
+// A link as shown on a one-line note: no "https://" or "www.", and a long
+// address cut after its first part, e.g. "ats-uk.net/products/…".
+export function shortLink(href: string, max = 32) {
+  const url = new URL(href);
+  const host = url.hostname.replace(/^www\./i, "");
+  const rest = `${url.pathname}${url.search}${url.hash}`.replace(/^\/$/, "");
+  if (!rest) return host;
+  const full = `${host}${rest}`;
+  if (full.length <= max) return full;
+  const first = url.pathname.split("/").filter(Boolean)[0];
+  return first && first.length <= 24 ? `${host}/${first}/…` : `${host}/…`;
+}

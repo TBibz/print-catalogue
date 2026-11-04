@@ -133,6 +133,17 @@ function Preview({ colour, hex }: { colour: Colour; hex: string }) {
       </span>
     );
   }
+  if (colour.key === "colour_nav_highlight") {
+    // Like the current page's link in the top bar.
+    return (
+      <span className="inline-flex min-w-[11rem] items-center gap-1 text-sm">
+        <span className="rounded-md px-2.5 py-1.5 text-neutral-700">Notepad</span>
+        <span className="rounded-md px-2.5 py-1.5 font-bold" style={{ backgroundColor: hex, color: textColourOn(hex) }}>
+          Queue
+        </span>
+      </span>
+    );
+  }
   return (
     <span
       className="inline-flex h-8 min-w-[11rem] items-center rounded px-3 text-xs font-bold tracking-wide uppercase"

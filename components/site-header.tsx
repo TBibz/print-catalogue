@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { signOut } from "@/app/actions/auth";
-import { AdminNav, NavLink } from "@/components/admin-menu";
+import { AdminNav, NavLink, NotepadNavLink } from "@/components/admin-menu";
 import { AutoHideHeader } from "@/components/auto-hide-header";
 import { getCurrentProfile } from "@/lib/auth";
 
@@ -21,7 +21,7 @@ export function SiteHeader() {
               that's only known at request time, so it streams in; plain
               links show until then. */}
           <Suspense fallback={<PlainLinks />}>
-            <NavLink href="/notepad">Notepad</NavLink>
+            <NotepadNavLink />
             <NavLink href="/invoices">Invoices</NavLink>
           </Suspense>
           {/* Checking the role needs the login cookie, so it streams in. */}

@@ -2,6 +2,8 @@
 
 // Saving notepad lines. RLS and the guard trigger in 0003_notepad.sql
 // decide who may change what; these just pass the request on.
+import { getCurrentProfile } from "@/lib/auth";
+import { loadUntickedNoteCount } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_NOTE_LINE, NOTE_LINE_COLUMNS, type NoteLine } from "@/lib/notepad";
 
@@ -83,6 +85,18 @@ export async function restoreNotepadLine(line: NoteLine): Promise<NoteResult> {
     return { ok: false, error: error.code === "42501" ? "You can only restore your own lines." : "Couldn't undo. Please try again." };
   }
   return { ok: true, line };
+}
+
+// For "Notepad (N)" in the header: unticked, non-blank lines, counted in the
+// database (never by loading the lines). null if it can't be worked out.
+export async function getUntickedNoteCount(): Promise<number | null> {
+  if (!(await getCurrentProfile())) return null;
+  try {
+    return await loadUntickedNoteCount(await createClient());
+  } catch (error) {
+    console.error("notepad count:", error);
+    return null;
+  }
 }
 
 function friendlyError(error: { code?: string; message: string }) {

@@ -9,6 +9,9 @@
 //
 // One listener for the whole page (mounted once in the app layout), so long
 // lists like the catalogue cost nothing extra.
+//
+// data-tip-if-cut: only show it when the element's text is cut off with "…"
+// (e.g. a long notepad line), not when it's all visible anyway.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const DELAY = 350; // ms the pointer rests before the tooltip shows
@@ -36,6 +39,7 @@ export function Tooltips() {
       const r = el.getBoundingClientRect();
       // Gone from the page, or hidden: nothing to point at.
       if (!text || !el.isConnected || (r.width === 0 && r.height === 0)) return;
+      if (el.hasAttribute("data-tip-if-cut") && el.scrollWidth <= el.clientWidth) return;
       // Below the element, unless that would go off the bottom of the window.
       const above = r.bottom + GAP + 40 > window.innerHeight;
       setTip({ text, left: r.left, top: above ? r.top - GAP : r.bottom + GAP, above });

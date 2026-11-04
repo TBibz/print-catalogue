@@ -17,6 +17,8 @@ export const THEME_COLOURS = [
   { key: "colour_row_new", group: "rows", label: "New models", help: "Models with the NEW badge.", defaultValue: "#fef7d7" },
   { key: "colour_row_requested", group: "rows", label: "Requested", help: "Catalogue and Models rows with an open request.", defaultValue: "#e3f5e8" },
   { key: "colour_row_alt", group: "rows", label: "Alternate rows", help: "Every other row in tables.", defaultValue: "#f3f1f8" },
+  // The current page's link in the top bar (and "Setup ▾" on Setup pages).
+  { key: "colour_nav_highlight", group: "headers", label: "Navbar highlight", help: "The current page's link in the top bar.", defaultValue: "#3b2a5c" },
   // Table headers (the sticky row of column names).
   { key: "colour_head_catalogue", group: "headers", label: "Catalogue header", help: "", defaultValue: "#3b2a5c" },
   { key: "colour_head_queue", group: "headers", label: "Queue header", help: "", defaultValue: "#3b2a5c" },

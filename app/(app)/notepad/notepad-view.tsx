@@ -8,8 +8,9 @@ import {
   saveNotepadLine,
   setNotepadLineDone,
 } from "@/app/actions/notepad";
-import { splitLinks } from "@/lib/links";
+import { shortLink, splitLinks } from "@/lib/links";
 import { MAX_NOTE_LINE, type NoteLine } from "@/lib/notepad";
+import { setNotepadCount } from "@/lib/notepad-count";
 
 // A handwriting-style font that is still easy to read.
 const handwriting = Patrick_Hand({ weight: "400", subsets: ["latin"] });
@@ -20,7 +21,8 @@ const UNDO_MS = 6000; // how long "Note deleted · Undo" stays
 
 // The page looks like a real notepad: light-blue ruled lines (a rule every
 // 48px, .notepad-ruled in globals.css) with the writing sitting on them.
-// Long lines wrap onto the next rule; a few spare rules fill the page below.
+// Each entry shows on one line (cut off with "…" if it's long); while it's
+// being edited it can wrap onto the next rules. Spare rules fill the page.
 const RULED_LINE = "min-h-12 notepad-ruled";
 const MIN_RULED_LINES = 12;
 // The writing: 48px lines, nudged down so the letters sit on each rule.
@@ -148,6 +150,13 @@ export function NotepadView({
   const handleFocused = useCallback(() => setFocusKey(null), []);
 
   const spareLines = Math.max(0, MIN_RULED_LINES - items.length);
+
+  // "Notepad (N)" in the header follows every add, tick, untick, delete and
+  // undo here straight away (saved lines that aren't ticked or blank).
+  const unticked = items.filter((it) => it.line && !it.line.done && it.line.text.trim()).length;
+  useEffect(() => {
+    setNotepadCount(unticked);
+  }, [unticked]);
 
   return (
     // No card or background: ruled lines straight on the white page, as
@@ -412,8 +421,9 @@ function NoteRow({
 
   const saved = Boolean(item.line);
 
-  // Clicking the text opens the box, with the cursor where you clicked.
-  // Clicking a link opens the link instead (in a new tab).
+  // Clicking the text opens the box (full text and full links), with the
+  // cursor where you clicked. Clicking a link opens the link instead (in a
+  // new tab).
   // (On mouse-down, before the text itself takes the focus, so the click
   // position is known.)
   function startEditing(e: React.MouseEvent<HTMLDivElement>) {
@@ -459,9 +469,12 @@ function NoteRow({
           className={`${WRITING} block min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 outline-none placeholder:text-neutral-400 ${colour}`}
         />
       ) : (
-        // The line as text: wraps, and web links can be clicked. Tab moves
+        // The line as text, on one line: cut off with "…" if it's too long
+        // (full text on hover), links shortened but clickable. Tab moves
         // here like a box would, and opens it.
         <div
+          data-tip={text || undefined}
+          data-tip-if-cut
           role={canEdit ? "textbox" : undefined}
           aria-label={isLast && !saved ? "New notepad line" : "Notepad line"}
           tabIndex={canEdit ? 0 : undefined}
@@ -469,24 +482,30 @@ function NoteRow({
           onFocus={(e) => {
             if (canEdit && e.target === e.currentTarget) setEditing(true);
           }}
-          className={`${WRITING} min-h-12 min-w-0 flex-1 break-words whitespace-pre-wrap outline-none ${colour} ${
+          className={`${WRITING} h-12 min-w-0 flex-1 truncate outline-none ${colour} ${
             canEdit ? "cursor-text" : ""
           }`}
         >
           {text ? (
-            splitLinks(text).map((part, i) =>
+            // data-start: where each piece begins in the real text, so a
+            // click can put the cursor in the right place.
+            withStarts(splitLinks(text)).map(({ part, start }) =>
               part.href ? (
                 <a
-                  key={i}
+                  key={start}
                   href={part.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="break-all text-blue-700 underline hover:text-blue-900"
+                  data-start={start}
+                  data-tip={part.href}
+                  className="text-blue-700 underline hover:text-blue-900"
                 >
-                  {part.text}
+                  {shortLink(part.href)}
                 </a>
               ) : (
-                <span key={i}>{part.text}</span>
+                <span key={start} data-start={start}>
+                  {part.text}
+                </span>
               ),
             )
           ) : (
@@ -521,9 +540,20 @@ function NoteRow({
   );
 }
 
+// Each piece of a line with where it starts in the full text.
+function withStarts(parts: { text: string; href?: string }[]) {
+  let start = 0;
+  return parts.map((part) => {
+    const at = start;
+    start += part.text.length;
+    return { part, start: at };
+  });
+}
+
 // How many characters into the line a click landed, so the box opens with
-// the cursor there. (Links show the same characters as the text, so the
-// count is the same in the box.)
+// the cursor there. Plain text shows exactly as typed, so the position is
+// where that piece starts plus how far into it the click was. (A click past
+// the end, or on the "…", puts the cursor at the end.)
 function offsetAt(container: HTMLElement, x: number, y: number): number | null {
   const doc = document as Document & {
     caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
@@ -538,8 +568,9 @@ function offsetAt(container: HTMLElement, x: number, y: number): number | null {
     if (range) ({ startContainer: node, startOffset: offset } = range);
   }
   if (!node || !container.contains(node)) return null;
-  const before = document.createRange();
-  before.selectNodeContents(container);
-  before.setEnd(node, offset);
-  return before.toString().length;
+  const piece = (node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element))?.closest<HTMLElement>(
+    "[data-start]",
+  );
+  if (!piece || !container.contains(piece) || piece.tagName === "A") return null;
+  return Number(piece.dataset.start) + (node.nodeType === Node.TEXT_NODE ? offset : 0);
 }

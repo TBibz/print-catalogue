@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { getUntickedNoteCount } from "@/app/actions/notepad";
+import { setNotepadCount, useNotepadCount } from "@/lib/notepad-count";
 
 // The admin-only pages: the everyday ones in the header, the rest under
 // "Setup ▾".
@@ -21,7 +23,10 @@ const SETUP_LINKS = [
 ];
 
 const navLink = "rounded-md px-2.5 py-1.5 text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900";
-const currentLink = "rounded-md px-2.5 py-1.5 bg-neutral-100 font-medium text-neutral-900";
+// The current page: the "Navbar highlight" colour (Settings → Colours) with
+// bold text, white or dark to suit it.
+const currentLink =
+  "rounded-md px-2.5 py-1.5 bg-[var(--colour-nav-highlight)] font-bold text-[var(--colour-nav-highlight-text)]";
 
 const isCurrent = (pathname: string, href: string) =>
   pathname === href || pathname.startsWith(`${href}/`);
@@ -35,6 +40,34 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
       {children}
     </Link>
   );
+}
+
+// "Notepad (2)": how many notepad lines aren't ticked off yet (just
+// "Notepad" when there are none). Asked of the database on every page change
+// and when coming back to the tab; the notepad page updates it straight away
+// as lines change (lib/notepad-count.ts).
+export function NotepadNavLink() {
+  const pathname = usePathname();
+  const count = useNotepadCount();
+
+  useEffect(() => {
+    let current = true;
+    const refresh = () =>
+      void getUntickedNoteCount().then((n) => {
+        if (current && n !== null) setNotepadCount(n);
+      });
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      current = false;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [pathname]);
+
+  return <NavLink href="/notepad">{count ? `Notepad (${count})` : "Notepad"}</NavLink>;
 }
 
 // The admin links: Queue, Jobs, Reports, Models, then "Setup ▾".
@@ -97,8 +130,10 @@ function SetupMenu() {
                   href={l.href}
                   aria-current={current ? "page" : undefined}
                   onClick={() => setOpen(false)}
-                  className={`block px-4 py-2.5 text-sm hover:bg-neutral-100 hover:text-neutral-900 ${
-                    current ? "font-medium text-neutral-900" : "text-neutral-700"
+                  className={`block px-4 py-2.5 text-sm ${
+                    current
+                      ? "bg-[var(--colour-nav-highlight)] font-bold text-[var(--colour-nav-highlight-text)]"
+                      : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
                   }`}
                 >
                   {l.label}
