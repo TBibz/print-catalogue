@@ -1,5 +1,5 @@
-// Column headings for the tables (catalogue, queue, models, invoice builder
-// and invoices list): bold text on the header colour from Settings → Colours
+// Column headings for the tables (catalogue, queue, models, invoice builder,
+// invoices list and reports): bold text on the header colour from Settings → Colours
 // (lib/theme.ts), white or dark to suit it. They stick to the top of the
 // screen while scrolling, right under the site header when it's showing
 // (--nav-offset, set by components/auto-hide-header.tsx) and move with it.
@@ -12,6 +12,7 @@ const COLOURS = {
   queue: "bg-[var(--colour-head-queue)] text-[var(--colour-head-queue-text)]",
   models: "bg-[var(--colour-head-models)] text-[var(--colour-head-models-text)]",
   builder: "bg-[var(--colour-head-builder)] text-[var(--colour-head-builder-text)]",
+  reports: "bg-[var(--colour-head-reports)] text-[var(--colour-head-reports-text)]",
 };
 
 export function stickyHeadings(table: keyof typeof COLOURS) {

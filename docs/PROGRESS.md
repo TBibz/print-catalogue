@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-11-01 (Phase 9: invoices)_
+_Last updated: 2026-11-04 (notepad lines and undo, Reports, Setup menu)_
 
 ## Phases
 
@@ -110,7 +110,7 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 
 ### 7. Money and stats: Done (not yet tested against the real database)
 - `0012_money.sql`: `monthly_money` (admin only), settings `opening_balance` and `money_start_month` (defaults to the first completed job's month), `money_by_month()` (Europe/London months, every job, newest first) and `print_stats_by_printer()`. Checked in PGlite: a job finished at 23:30 UTC on 30 June counts in July, cancelled jobs don't count, Dad gets no rows, half-month dates are refused, safe to run twice
-- `/admin/money` ("Money" in the header): running total, Starting balance (opening balance + first month), table newest first with autosaving Payments and Costs, "Materials from jobs" reference, coloured differences, all-time stats per printer and top 10 models
+- `/admin/money` ("Money" in the header; since moved to Reports → Money): running total, Starting balance (opening balance + first month), table newest first with autosaving Payments and Costs, "Materials from jobs" reference, coloured differences, all-time stats per printer and top 10 models
 - Money formatting everywhere (`lib/money.ts`): "£1,234.56", "−£12.34"; £ boxes (`components/money-input.tsx`) with a fixed £ that accept "12", "12.5", "1,200". Used on Money, Jobs, the Start print panel (est. cost, my cost, charge) and Materials (pack price, charge)
 - The page layout was checked with sample data in the browser pane (desktop and phone), using a temporary preview page that wasn't committed
 ### 8. Future-proofing and polish: Done (one commit per item)
@@ -238,6 +238,15 @@ _Last updated: 2026-11-01 (Phase 9: invoices)_
 - Settings → Colours: picker, live preview, Save, Reset to default; a warning under row colours that are too dark (luminance below 0.45). Saving a colour refreshes the app
 - Checked in the browser pane with a temporary preview page (not committed): defaults identical to before, priority order right, pill and header text switch to dark on light colours, the warning shows. Not checked logged in (Claude can't log in)
 
+### Notepad lines and undo, Reports, Setup menu: Done (needs `0022` run)
+- Notepad: light-blue ruled lines (`#bcd7f2`) with the writing sitting on them, spare lines below (at least 12 in all); "×" at the end of each line the user may delete (admin any, requester own) deletes straight away and shows "Note deleted · Undo" for 6 seconds; Undo calls `restore_notepad_line()` (same id, author, position, tick and tick time; unsaved typing on the line is kept)
+- Reports (`/admin/reports`, replaces Money; `/admin/money` redirects permanently to `?tab=money`): Printing tab (default) with Monthly / Yearly / Custom range, printer filter, five summary cards, a bar chart of models printed (Reports colour, hover for figures, the peak labelled), a table by month or year with a totals row, and the stats moved from Money (per printer and top 10, now for the period and printer). The choices live in the address, so each change reloads from the database. Money tab unchanged apart from the stats moving out
+- `0022`: `report_jobs`, `print_report`, `print_report_totals`, `print_report_by_printer`, `print_report_top_models` (all totals in the database), `restore_notepad_line`, `colour_head_reports`. Checked in PGlite: a job finished at 23:30 UTC on 30 June counts in July, a failed plate counts weight and cost with its recorded £0 charge (negative margin), cancelled jobs are left out, empty months listed, printer filter, top models, Dad gets nothing; restore keeps author and tick, Dad can't restore the admin's line, the normal tick rule still applies; safe to run twice
+- Nav: Notepad · Invoices · Queue · Jobs · Reports · Models · Setup ▾ (Categories, Upload, Materials, Printers, Settings), Setup highlighted on those pages. Dad's header is unchanged (Notepad, Invoices)
+- Settings → Colours gains "Reports header" (also the chart bars)
+- Removed: the old Money page's stats loaders (`loadPrinterStats`, `loadTopModels`) and their types
+- Checked with sample data in the browser pane (temporary preview page, not committed): chart, cards, table (heading directly above the first row and sticky), stats, nav and Setup menu, ruled notepad; the redirect checked on the dev server. Not checked logged in
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -265,6 +274,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0019_invoices.sql` | 9 | customers, invoices, invoice lines, numbering counter, `invoice_totals`, invoice functions, company settings readable by both roles | ☐ |
 | `0020_mark_invoice_sent.sql` | 9 | `invoices.sent_method` (existing sent ones become `email`), `mark_invoice_sent_manually()`, `unmark_invoice_sent()`; `mark_invoice_sent()` records `email` | ☐ |
 | `0021_theme_colours.sql` | 9 | colour_ settings with defaults, readable by both roles; `model_printing()` | ☐ |
+| `0022_reports_notepad_undo.sql` | 9 | printing report functions, `restore_notepad_line()` (and the notepad guard lets a restore through), `colour_head_reports` | ☐ |
 
 Also in `supabase/snippets/` (run by hand, never automatically):
 - `make-admin.sql` (one-off, makes your account admin)

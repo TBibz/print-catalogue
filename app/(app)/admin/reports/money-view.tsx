@@ -4,29 +4,15 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { saveMoneySettings, saveMonthlyMoney } from "@/app/actions/money";
 import { MoneyInput } from "@/components/money-input";
 import { formatMoney, formatMoneyInput, moneyTone, parseMoney, toPence } from "@/lib/money";
-import {
-  monthLabel,
-  type MoneyMonth,
-  type MoneySettings,
-  type PrinterStats,
-  type TopModel,
-} from "@/lib/money-data";
+import { monthLabel, type MoneyMonth, type MoneySettings } from "@/lib/money-data";
 
 const TYPING_PAUSE_MS = 800;
 const SAVED_MESSAGE_MS = 2500;
 const COLUMNS = "md:grid-cols-[6.5rem_minmax(0,1fr)_7rem_9.5rem_11.5rem_8rem]";
 
-export function MoneyView({
-  months: serverMonths,
-  settings,
-  printerStats,
-  topModels,
-}: {
-  months: MoneyMonth[];
-  settings: MoneySettings;
-  printerStats: PrinterStats[];
-  topModels: TopModel[];
-}) {
+// Reports → Money. (The print stats that used to be at the bottom are on
+// the Printing tab now, for any period and printer.)
+export function MoneyView({ months: serverMonths, settings }: { months: MoneyMonth[]; settings: MoneySettings }) {
   const [months, setMonths] = useState(serverMonths);
 
   // Next.js keeps this page alive between visits; take fresh data when the
@@ -91,8 +77,6 @@ export function MoneyView({
           </div>
         )}
       </section>
-
-      <Stats printerStats={printerStats} topModels={topModels} />
     </div>
   );
 }
@@ -305,67 +289,5 @@ function MonthRow({
         </span>
       </div>
     </li>
-  );
-}
-
-// ---- Stats -----------------------------------------------------------------------
-
-function Stats({ printerStats, topModels }: { printerStats: PrinterStats[]; topModels: TopModel[] }) {
-  const plates = printerStats.reduce((s, p) => s + p.plates, 0);
-  const items = printerStats.reduce((s, p) => s + p.items, 0);
-  const charge = printerStats.reduce((s, p) => s + p.charge, 0);
-
-  return (
-    <section aria-labelledby="stats-heading">
-      <h2 id="stats-heading" className="mb-3 text-lg font-semibold">
-        Stats (all time)
-      </h2>
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-neutral-200 p-4">
-          <p className="text-2xl font-semibold tabular-nums">
-            {plates} {plates === 1 ? "plate" : "plates"} · {items} {items === 1 ? "item" : "items"}
-          </p>
-          <p className="mb-3 text-sm text-neutral-600">Total charge {formatMoney(charge)}</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 text-left text-xs tracking-wide text-neutral-500 uppercase">
-                <th className="py-1.5 font-medium">Printer</th>
-                <th className="py-1.5 text-right font-medium">Plates</th>
-                <th className="py-1.5 text-right font-medium">Items</th>
-                <th className="py-1.5 text-right font-medium">Charge</th>
-              </tr>
-            </thead>
-            <tbody>
-              {printerStats.map((p) => (
-                <tr key={p.printer_id} className="border-b border-neutral-100">
-                  <td className="py-1.5">{p.printer_name}</td>
-                  <td className="py-1.5 text-right tabular-nums">{p.plates}</td>
-                  <td className="py-1.5 text-right tabular-nums">{p.items}</td>
-                  <td className="py-1.5 text-right tabular-nums">{formatMoney(p.charge)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="rounded-lg border border-neutral-200 p-4">
-          <h3 className="mb-2 font-medium">Most printed models</h3>
-          {topModels.length === 0 ? (
-            <p className="text-sm text-neutral-500">Nothing printed yet.</p>
-          ) : (
-            <ol className="space-y-1 text-sm">
-              {topModels.map((m, i) => (
-                <li key={m.code} className="flex items-baseline gap-2">
-                  <span className="w-5 text-right text-neutral-400 tabular-nums">{i + 1}.</span>
-                  <span className="font-mono">{m.code}</span>
-                  <span className="min-w-0 flex-1 truncate">{m.name}</span>
-                  <span className="tabular-nums">{m.count}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }

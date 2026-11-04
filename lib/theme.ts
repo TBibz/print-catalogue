@@ -22,6 +22,7 @@ export const THEME_COLOURS = [
   { key: "colour_head_queue", group: "headers", label: "Queue header", help: "", defaultValue: "#3b2a5c" },
   { key: "colour_head_models", group: "headers", label: "Models header", help: "", defaultValue: "#3b2a5c" },
   { key: "colour_head_builder", group: "headers", label: "Invoice builder header", help: "Also the invoices list.", defaultValue: "#3b2a5c" },
+  { key: "colour_head_reports", group: "headers", label: "Reports header", help: "Also the Reports chart bars.", defaultValue: "#3b2a5c" },
   { key: "colour_invoice", group: "headers", label: "Invoice document", help: "The header row and Grand Total box on the invoice page and PDF.", defaultValue: "#3b2a5c" },
   // Urgency pills.
   { key: "colour_urgency_asap", group: "urgency", label: "ASAP pill", help: "", defaultValue: "#9f0712" },

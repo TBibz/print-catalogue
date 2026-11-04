@@ -13,16 +13,6 @@ export type MoneyMonth = {
   difference: number; // payments − (charge + costs)
 };
 
-export type PrinterStats = {
-  printer_id: string;
-  printer_name: string;
-  plates: number;
-  items: number;
-  charge: number;
-};
-
-export type TopModel = { code: string; name: string; count: number };
-
 export type MoneySettings = {
   openingBalance: number;
   startMonth: string; // "2026-07-01"

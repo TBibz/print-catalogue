@@ -12,7 +12,7 @@ import {
   type RequestLineRow,
 } from "@/lib/requests";
 import type { ColourOption } from "@/lib/colours";
-import type { MoneyMonth, MoneySettings, PrinterStats, TopModel } from "@/lib/money-data";
+import type { MoneyMonth, MoneySettings } from "@/lib/money-data";
 import { DEFAULT_RESIN_DIVISOR, JOB_COLUMNS, type Job, type JobFormOptions } from "@/lib/jobs";
 import { MATERIAL_COLUMNS, PRINTER_COLUMNS, type Material, type Printer } from "@/lib/materials";
 import { NOTE_LINE_COLUMNS, type NoteLine } from "@/lib/notepad";
@@ -322,37 +322,3 @@ export async function loadMoneySettings(supabase: SupabaseClient): Promise<Money
   };
 }
 
-export async function loadPrinterStats(supabase: SupabaseClient) {
-  const data = await fetchAll<PrinterStats>((from, to) =>
-    supabase.rpc("print_stats_by_printer").order("printer_name").order("printer_id").range(from, to) as unknown as PromiseLike<{
-      data: PrinterStats[] | null;
-      error: { message: string } | null;
-    }>,
-  );
-  return data.map((r) => ({ ...r, charge: Number(r.charge) }));
-}
-
-// The most printed models (successful prints in completed jobs).
-export async function loadTopModels(supabase: SupabaseClient, limit = 10): Promise<TopModel[]> {
-  const { data: totals, error } = await (supabase
-    .rpc("model_print_totals")
-    .select("model_id, printed_total")
-    .gt("printed_total", 0)
-    .order("printed_total", { ascending: false })
-    .order("model_id")
-    .limit(limit) as unknown as Rows<{ model_id: string; printed_total: number }>);
-  if (error) throw new Error(error.message);
-  if (!totals?.length) return [];
-  const { data: models, error: modelsError } = await supabase
-    .from("models")
-    .select("id, code, name")
-    .in("id", totals.map((t) => t.model_id))
-    .returns<{ id: string; code: string; name: string }[]>();
-  if (modelsError) throw new Error(modelsError.message);
-  const byId = new Map((models ?? []).map((m) => [m.id, m]));
-  return totals.map((t) => ({
-    code: byId.get(t.model_id)?.code ?? "?",
-    name: byId.get(t.model_id)?.name ?? "",
-    count: t.printed_total,
-  }));
-}

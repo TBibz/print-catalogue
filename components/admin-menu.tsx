@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-// Every admin-only page, in header order.
+// The admin-only pages: the everyday ones in the header, the rest under
+// "Setup ▾".
 const ADMIN_LINKS = [
   { href: "/admin/queue", label: "Queue" },
   { href: "/admin/jobs", label: "Jobs" },
-  { href: "/admin/money", label: "Money" },
+  { href: "/admin/reports", label: "Reports" },
   { href: "/admin/models", label: "Models" },
+];
+const SETUP_LINKS = [
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/upload", label: "Upload" },
   { href: "/admin/materials", label: "Materials" },
@@ -34,32 +37,28 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
   );
 }
 
-// The admin links: all in a row on wide screens (xl), in an "Admin ▾"
-// drop-down on smaller ones, where they don't fit.
+// The admin links: Queue, Jobs, Reports, Models, then "Setup ▾".
 export function AdminNav() {
   return (
     <>
-      <span className="hidden items-center gap-x-1 xl:flex">
-        {ADMIN_LINKS.map((l) => (
-          <NavLink key={l.href} href={l.href}>
-            {l.label}
-          </NavLink>
-        ))}
-      </span>
-      <span className="xl:hidden">
-        <AdminMenu />
-      </span>
+      {ADMIN_LINKS.map((l) => (
+        <NavLink key={l.href} href={l.href}>
+          {l.label}
+        </NavLink>
+      ))}
+      <SetupMenu />
     </>
   );
 }
 
-// The drop-down. Closes when a link is chosen, on a click anywhere else,
-// or with Esc.
-function AdminMenu() {
+// The "Setup ▾" drop-down (Categories, Upload, Materials, Printers,
+// Settings). Highlighted while on any of those pages. Closes when a link is
+// chosen, on a click anywhere else, or with Esc.
+function SetupMenu() {
   const [open, setOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const inAdmin = ADMIN_LINKS.some((l) => isCurrent(pathname, l.href));
+  const inSetup = SETUP_LINKS.some((l) => isCurrent(pathname, l.href));
 
   useEffect(() => {
     if (!open) return;
@@ -84,13 +83,13 @@ function AdminMenu() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
-        className={inAdmin ? currentLink : navLink}
+        className={inSetup ? currentLink : navLink}
       >
-        Admin <span aria-hidden>▾</span>
+        Setup <span aria-hidden>▾</span>
       </button>
       {open && (
         <ul className="absolute left-0 z-40 mt-1 min-w-44 rounded-md border border-neutral-200 bg-white py-1 shadow-lg">
-          {ADMIN_LINKS.map((l) => {
+          {SETUP_LINKS.map((l) => {
             const current = isCurrent(pathname, l.href);
             return (
               <li key={l.href}>

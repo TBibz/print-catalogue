@@ -4,6 +4,7 @@ import { Patrick_Hand } from "next/font/google";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   deleteNotepadLine,
+  restoreNotepadLine,
   saveNotepadLine,
   setNotepadLineDone,
 } from "@/app/actions/notepad";
@@ -14,6 +15,13 @@ const handwriting = Patrick_Hand({ weight: "400", subsets: ["latin"] });
 
 const TYPING_PAUSE_MS = 800;
 const SAVED_MESSAGE_MS = 2000;
+const UNDO_MS = 6000; // how long "Note deleted · Undo" stays
+
+// The page looks like a real notepad: light-blue ruled lines with the
+// writing sitting on them. Every row (written or empty) is one ruled line,
+// and a few spare ones fill the page below.
+const RULED_LINE = "h-12 border-b border-[#bcd7f2]";
+const MIN_RULED_LINES = 12;
 
 // One bullet on the page. `line` is null until something has been saved.
 type Item = { key: string; line: NoteLine | null; position: number };
@@ -67,6 +75,46 @@ export function NotepadView({
     setItems((prev) => withTrailingDraft(prev.filter((it) => it.key !== key)));
   }, []);
 
+  // "×": the line is deleted straight away; "Undo" puts it back for a few
+  // seconds afterwards.
+  const [undo, setUndo] = useState<{ line: NoteLine; error?: string } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+  }, []);
+
+  const handleDeleted = useCallback(
+    (key: string, line: NoteLine) => {
+      handleRemoved(key);
+      setUndo({ line });
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+      undoTimer.current = setTimeout(() => setUndo(null), UNDO_MS);
+    },
+    [handleRemoved],
+  );
+
+  async function undoDelete() {
+    if (!undo) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const { line } = undo;
+    const result = await restoreNotepadLine(line);
+    if (!result.ok) {
+      setUndo({ line, error: result.error });
+      undoTimer.current = setTimeout(() => setUndo(null), UNDO_MS);
+      return;
+    }
+    setUndo(null);
+    // Back in its place (lines are kept in position order).
+    setItems((prev) => {
+      const saved = prev.filter((it) => it.line);
+      const drafts = prev.filter((it) => !it.line);
+      const back = [...saved, { key: line.id, line, position: line.position }].sort(
+        (a, b) => a.position - b.position,
+      );
+      return withTrailingDraft([...back, ...drafts]);
+    });
+  }
+
   // Enter: start a new line straight after this one.
   // (Worked out from `items` directly, not inside setItems, so the new
   // line's key and the focus always match.)
@@ -96,10 +144,12 @@ export function NotepadView({
 
   const handleFocused = useCallback(() => setFocusKey(null), []);
 
+  const spareLines = Math.max(0, MIN_RULED_LINES - items.length);
+
   return (
-    // No card or paper effect: the lines sit straight on the white page.
+    // No card or background: ruled lines straight on the white page.
     <div className="max-w-3xl">
-      <ul className={handwriting.className}>
+      <ul className={`${handwriting.className} border-t border-[#bcd7f2]`}>
         {items.map((item, i) => (
           <NoteRow
             key={`${item.key}@${synced.version}`}
@@ -111,14 +161,33 @@ export function NotepadView({
             onFocused={handleFocused}
             onSaved={handleSaved}
             onRemoved={handleRemoved}
+            onDeleted={handleDeleted}
             onEnter={handleEnter}
             onFocusPrevious={handleFocusPrevious}
           />
+        ))}
+        {Array.from({ length: spareLines }, (_, i) => (
+          <li key={`spare-${i}`} aria-hidden className={RULED_LINE} />
         ))}
       </ul>
       <p className="mt-3 font-sans text-sm text-neutral-500">
         Press Enter for a new line. Changes save automatically.
       </p>
+
+      {undo && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full bg-neutral-900 px-5 py-2.5 font-sans text-sm text-white shadow-lg"
+        >
+          {undo.error ? <span className="text-red-200">{undo.error}</span> : <span>Note deleted</span>}
+          <span aria-hidden className="text-neutral-500">
+            ·
+          </span>
+          <button type="button" onClick={() => void undoDelete()} className="font-semibold underline hover:no-underline">
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -134,6 +203,7 @@ function NoteRow({
   onFocused,
   onSaved,
   onRemoved,
+  onDeleted,
   onEnter,
   onFocusPrevious,
 }: {
@@ -145,6 +215,7 @@ function NoteRow({
   onFocused: () => void;
   onSaved: (key: string, line: NoteLine) => void;
   onRemoved: (key: string) => void;
+  onDeleted: (key: string, line: NoteLine) => void;
   onEnter: (key: string) => void;
   onFocusPrevious: (key: string) => void;
 }) {
@@ -294,10 +365,31 @@ function NoteRow({
     onSaved(item.key, result.line);
   }
 
+  // "×": delete straight away (the page offers Undo). Anything typed but not
+  // saved yet goes with it, so Undo brings back the text as shown.
+  async function handleDelete() {
+    const line = lineRef.current;
+    if (!line) return;
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    setStatus({ kind: "saving" });
+    const result = await deleteNotepadLine(line.id);
+    if (!result.ok) {
+      setStatus({ kind: "error", message: result.error });
+      return;
+    }
+    lineRef.current = null;
+    const shown = textRef.current.trim();
+    onDeleted(item.key, shown ? { ...line, text: shown } : line);
+  }
+
   const saved = Boolean(item.line);
 
   return (
-    <li className="flex items-center gap-3 py-1">
+    // One ruled line; the writing sits on it.
+    <li className={`flex items-end gap-3 ${RULED_LINE}`}>
       {isAdmin && (
         <input
           type="checkbox"
@@ -305,10 +397,10 @@ function NoteRow({
           checked={done}
           disabled={!saved}
           onChange={(e) => void handleTick(e.target.checked)}
-          className={`h-5 w-5 shrink-0 cursor-pointer accent-neutral-900 ${saved ? "" : "invisible"}`}
+          className={`mb-1.5 h-5 w-5 shrink-0 cursor-pointer accent-neutral-900 ${saved ? "" : "invisible"}`}
         />
       )}
-      <span aria-hidden className="text-2xl text-neutral-500">
+      <span aria-hidden className="pb-1 text-2xl leading-none text-neutral-500">
         •
       </span>
       <input
@@ -322,17 +414,33 @@ function NoteRow({
         onChange={(e) => handleChange(e.target.value)}
         onBlur={() => void flush(true)}
         onKeyDown={handleKeyDown}
-        className={`min-w-0 flex-1 bg-transparent py-1.5 text-2xl outline-none placeholder:text-neutral-400 ${
+        // The whole ruled line is clickable; the top padding drops the writing
+        // onto the line.
+        className={`h-12 min-w-0 flex-1 bg-transparent pt-5 pb-0 text-2xl leading-6 outline-none placeholder:text-neutral-400 ${
           done ? "text-neutral-400 line-through" : "text-neutral-900"
         } ${canEdit ? "" : "cursor-default"}`}
       />
-      <span className="max-w-56 min-w-20 shrink-0 text-right font-sans text-sm">
+      <span className="mb-2.5 max-w-56 min-w-20 shrink-0 text-right font-sans text-sm">
         {status.kind === "saving" && <span className="text-neutral-500">Saving…</span>}
         {status.kind === "saved" && <span className="text-green-700">Saved ✓</span>}
         {status.kind === "error" && (
           <span role="alert" className="text-red-700" data-tip={status.message}>
             {status.message}
           </span>
+        )}
+      </span>
+      {/* Delete: the admin any line, everyone else their own. */}
+      <span className="mb-1 w-7 shrink-0">
+        {saved && canEdit && (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            aria-label={`Delete: ${text}`}
+            data-tip="Delete this line"
+            className="h-7 w-7 rounded-full font-sans text-lg leading-none text-neutral-400 hover:bg-red-50 hover:text-red-700"
+          >
+            ×
+          </button>
         )}
       </span>
     </li>

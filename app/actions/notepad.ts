@@ -65,6 +65,26 @@ export async function deleteNotepadLine(id: string): Promise<NoteDeleteResult> {
   return { ok: true };
 }
 
+// Undo a delete: puts the line back exactly as it was (same id, author,
+// position and tick). restore_notepad_line() in 0022 checks who may.
+export async function restoreNotepadLine(line: NoteLine): Promise<NoteResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("restore_notepad_line", {
+    p_id: line.id,
+    p_text: line.text,
+    p_position: line.position,
+    p_created_by: line.created_by,
+    p_created_at: line.created_at,
+    p_done: line.done,
+    p_done_at: line.done_at,
+  });
+  if (error) {
+    console.error("restore_notepad_line:", error.message);
+    return { ok: false, error: error.code === "42501" ? "You can only restore your own lines." : "Couldn't undo. Please try again." };
+  }
+  return { ok: true, line };
+}
+
 function friendlyError(error: { code?: string; message: string }) {
   console.error("notepad_lines:", error.message);
   if (error.message.includes("Only the admin")) return "Only the admin can tick lines.";

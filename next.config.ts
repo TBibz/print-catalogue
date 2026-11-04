@@ -13,7 +13,11 @@ const nextConfig: NextConfig = {
   },
   // The catalogue is the home page for now.
   async redirects() {
-    return [{ source: "/", destination: "/catalogue", permanent: false }];
+    return [
+      { source: "/", destination: "/catalogue", permanent: false },
+      // Money moved into Reports (as its Money tab).
+      { source: "/admin/money", destination: "/admin/reports?tab=money", permanent: true },
+    ];
   },
 };
 
