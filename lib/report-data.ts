@@ -18,16 +18,30 @@ const numbers = <T extends Record<string, unknown>>(row: T, keys: (keyof T)[]) =
 };
 const MONEY_KEYS = ["plates", "models", "est_weight_g", "cost", "charge", "margin"] as const;
 
-// One row per month (Monthly, Custom) or year (Yearly), newest first.
+// One row per month (All Time, Monthly, Custom) or year (Yearly), newest
+// first. The database lists every month in the period; for Yearly it only
+// sends years with jobs, so the empty years in between are added here as
+// zero rows (one row per year from the start year to this year).
 export async function loadPrintReport(supabase: SupabaseClient, q: ReportQuery): Promise<ReportRow[]> {
-  const rows = await fetchAll<ReportRow>(
-    (from, to) =>
-      supabase
-        .rpc("print_report", { ...args(q), p_group: q.view === "yearly" ? "year" : "month" })
-        .order("period", { ascending: false })
-        .range(from, to) as unknown as Rows<ReportRow>,
-  );
-  return rows.map((r) => numbers(r, [...MONEY_KEYS]));
+  const rows = (
+    await fetchAll<ReportRow>(
+      (from, to) =>
+        supabase
+          .rpc("print_report", { ...args(q), p_group: q.view === "yearly" ? "year" : "month" })
+          .order("period", { ascending: false })
+          .range(from, to) as unknown as Rows<ReportRow>,
+    )
+  ).map((r) => numbers(r, [...MONEY_KEYS]));
+  if (q.view !== "yearly" || !q.from || !q.to) return rows;
+
+  const byYear = new Map(rows.map((r) => [r.period.slice(0, 4), r]));
+  const years: ReportRow[] = [];
+  for (let y = Number(q.to.slice(0, 4)); y >= Number(q.from.slice(0, 4)); y--) {
+    years.push(
+      byYear.get(String(y)) ?? { period: `${y}-01-01`, plates: 0, models: 0, est_weight_g: 0, cost: 0, charge: 0, margin: 0 },
+    );
+  }
+  return years;
 }
 
 export async function loadPrintReportTotals(supabase: SupabaseClient, q: ReportQuery): Promise<ReportTotals> {

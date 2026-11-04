@@ -10,7 +10,7 @@ import {
   loadPrintReportTopModels,
   loadPrintReportTotals,
 } from "@/lib/report-data";
-import { lastTwelveMonths, reportQueryFrom, type ReportTab } from "@/lib/reports";
+import { reportBounds, reportQueryFrom, type ReportTab } from "@/lib/reports";
 import { MoneyView } from "./money-view";
 import { PrintingView } from "./printing-view";
 
@@ -44,7 +44,9 @@ async function ReportsData({ searchParams }: { searchParams: PageProps<"/admin/r
       const [months, settings] = await Promise.all([loadMoneyMonths(supabase), loadMoneySettings(supabase)]);
       money = { months, settings };
     } else {
-      const query = reportQueryFrom(params);
+      // Reports start at the money start month (Settings → Money).
+      const bounds = reportBounds((await loadMoneySettings(supabase)).startMonth);
+      const query = reportQueryFrom(params, bounds);
       const [printers, rows, totals, byPrinter, topModels] = await Promise.all([
         loadPrinters(supabase),
         loadPrintReport(supabase, query),
@@ -54,7 +56,7 @@ async function ReportsData({ searchParams }: { searchParams: PageProps<"/admin/r
       ]);
       printing = {
         query,
-        defaultRange: lastTwelveMonths(),
+        bounds,
         printers: printers.map((p) => ({ id: p.id, name: p.name })),
         rows,
         totals,

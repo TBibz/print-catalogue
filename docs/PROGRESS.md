@@ -252,6 +252,11 @@ _Last updated: 2026-11-04 (notepad lines and undo, Reports, Setup menu)_
 - Settings → Money (`app/(app)/admin/settings/money-settings.tsx`): the same opening balance and first month fields and Save, using the same `saveMoneySettings` action. The stored settings and the running total / monthly calculations are untouched
 - Checked: the running-total line of code is identical before and after, and the old and new Money tabs rendered with the same sample data both show −£68.24 (temporary preview page, not committed)
 
+### Reports from the start month; wider notepad with links: Done (no SQL)
+- Reports → Printing: All Time (default) · Monthly · Yearly · Custom range, all bounded by the `money_start_month` setting and today (`reportBounds()` / `reportQueryFrom()` in `lib/reports.ts`; a missing or future start month counts as this month). Monthly has a month picker (start month → this month, default this month; a past month covers the whole month); Yearly lists every year from the start year (empty years added as zero rows in `loadPrintReport`); Custom range can't start before the start month (date pickers limited, and the server clamps anything outside). No database change: the 0022 functions already take any dates
+- Notepad: full page width; each line shows as wrapping text (rules every 48px via `.notepad-ruled` in globals.css, writing 3px above each rule) and turns into a growing text box when clicked, cursor where you clicked; web links found by `splitLinks()` in `lib/links.ts` (http/https and www. only, trailing punctuation left out, brackets balanced) open in a new tab with `noopener noreferrer`, wrap when long, and clicking them doesn't edit the line. Tab still moves between lines. On phones the "Saved ✓" space only takes room while it shows
+- Checked: the period rules with a start month of November 2026 (and one in 2025); link detection on sample text (including `javascript:`, `ftp:` and `mailto:`, which stay plain); in the browser pane with sample lines (temporary preview page, not committed): wrapped lines and long links stay on their rules, click-to-edit puts the cursor at the click, link clicks don't open the editor, no sideways scrolling on a phone
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.

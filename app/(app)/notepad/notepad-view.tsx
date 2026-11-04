@@ -1,13 +1,14 @@
 "use client";
 
 import { Patrick_Hand } from "next/font/google";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   deleteNotepadLine,
   restoreNotepadLine,
   saveNotepadLine,
   setNotepadLineDone,
 } from "@/app/actions/notepad";
+import { splitLinks } from "@/lib/links";
 import { MAX_NOTE_LINE, type NoteLine } from "@/lib/notepad";
 
 // A handwriting-style font that is still easy to read.
@@ -17,11 +18,13 @@ const TYPING_PAUSE_MS = 800;
 const SAVED_MESSAGE_MS = 2000;
 const UNDO_MS = 6000; // how long "Note deleted · Undo" stays
 
-// The page looks like a real notepad: light-blue ruled lines with the
-// writing sitting on them. Every row (written or empty) is one ruled line,
-// and a few spare ones fill the page below.
-const RULED_LINE = "h-12 border-b border-[#bcd7f2]";
+// The page looks like a real notepad: light-blue ruled lines (a rule every
+// 48px, .notepad-ruled in globals.css) with the writing sitting on them.
+// Long lines wrap onto the next rule; a few spare rules fill the page below.
+const RULED_LINE = "min-h-12 notepad-ruled";
 const MIN_RULED_LINES = 12;
+// The writing: 48px lines, nudged down so the letters sit on each rule.
+const WRITING = "relative top-[11px] text-2xl leading-12";
 
 // One bullet on the page. `line` is null until something has been saved.
 type Item = { key: string; line: NoteLine | null; position: number };
@@ -147,8 +150,9 @@ export function NotepadView({
   const spareLines = Math.max(0, MIN_RULED_LINES - items.length);
 
   return (
-    // No card or background: ruled lines straight on the white page.
-    <div className="max-w-3xl">
+    // No card or background: ruled lines straight on the white page, as
+    // wide as the page allows.
+    <div className="w-full">
       <ul className={`${handwriting.className} border-t border-[#bcd7f2]`}>
         {items.map((item, i) => (
           <NoteRow
@@ -167,7 +171,7 @@ export function NotepadView({
           />
         ))}
         {Array.from({ length: spareLines }, (_, i) => (
-          <li key={`spare-${i}`} aria-hidden className={RULED_LINE} />
+          <li key={`spare-${i}`} aria-hidden className={`h-12 ${RULED_LINE}`} />
         ))}
       </ul>
       <p className="mt-3 font-sans text-sm text-neutral-500">
@@ -223,7 +227,11 @@ function NoteRow({
   const [done, setDone] = useState(item.line?.done ?? false);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Lines show as text (with clickable links) and turn into a box to type
+  // in when clicked. caretAt: where to put the cursor when the box opens.
+  const [editing, setEditing] = useState(false);
+  const caretAt = useRef<number | null>(null);
   const textRef = useRef(text);
   const lineRef = useRef(item.line);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -236,14 +244,31 @@ function NoteRow({
     latest.current = { item, onSaved, onRemoved };
   });
 
-  // Move the cursor here when asked (e.g. after pressing Enter above).
+  // Move the cursor here when asked (e.g. after pressing Enter above): open
+  // the box straight away, cursor at the end.
+  if (autoFocus && !editing) setEditing(true);
   useEffect(() => {
-    if (!autoFocus) return;
-    const input = inputRef.current;
-    input?.focus();
-    input?.setSelectionRange(input.value.length, input.value.length);
-    onFocused();
+    if (autoFocus) onFocused();
   }, [autoFocus, onFocused]);
+
+  // When the box opens: focus it with the cursor where it was asked for
+  // (the end, unless the text was clicked).
+  useLayoutEffect(() => {
+    const box = inputRef.current;
+    if (!editing || !box) return;
+    box.focus();
+    const at = caretAt.current ?? box.value.length;
+    caretAt.current = null;
+    box.setSelectionRange(at, at);
+  }, [editing]);
+
+  // The box grows with the text, so long lines wrap like the text did.
+  useLayoutEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    box.style.height = "0px";
+    box.style.height = `${box.scrollHeight}px`;
+  }, [editing, text]);
 
   const showSaved = useCallback(() => {
     setStatus({ kind: "saved" });
@@ -334,7 +359,7 @@ function NoteRow({
     timer.current = setTimeout(() => void flush(false), TYPING_PAUSE_MS);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
       if (!textRef.current.trim()) return; // no piles of empty lines
@@ -387,9 +412,23 @@ function NoteRow({
 
   const saved = Boolean(item.line);
 
+  // Clicking the text opens the box, with the cursor where you clicked.
+  // Clicking a link opens the link instead (in a new tab).
+  // (On mouse-down, before the text itself takes the focus, so the click
+  // position is known.)
+  function startEditing(e: React.MouseEvent<HTMLDivElement>) {
+    if (!canEdit || e.button !== 0 || (e.target as Element).closest("a")) return;
+    e.preventDefault();
+    caretAt.current = offsetAt(e.currentTarget, e.clientX, e.clientY);
+    setEditing(true);
+  }
+
+  const placeholder = isLast && !saved ? "Write a new line…" : "";
+  const colour = done ? "text-neutral-400 line-through" : "text-neutral-900";
+
   return (
-    // One ruled line; the writing sits on it.
-    <li className={`flex items-end gap-3 ${RULED_LINE}`}>
+    // One or more ruled lines; the writing sits on them.
+    <li className={`flex items-start gap-3 ${RULED_LINE}`}>
       {isAdmin && (
         <input
           type="checkbox"
@@ -397,30 +436,65 @@ function NoteRow({
           checked={done}
           disabled={!saved}
           onChange={(e) => void handleTick(e.target.checked)}
-          className={`mb-1.5 h-5 w-5 shrink-0 cursor-pointer accent-neutral-900 ${saved ? "" : "invisible"}`}
+          className={`mt-[22px] h-5 w-5 shrink-0 cursor-pointer accent-neutral-900 ${saved ? "" : "invisible"}`}
         />
       )}
-      <span aria-hidden className="pb-1 text-2xl leading-none text-neutral-500">
+      <span aria-hidden className={`${WRITING} text-neutral-500`}>
         •
       </span>
-      <input
-        ref={inputRef}
-        type="text"
-        aria-label={isLast && !saved ? "New notepad line" : "Notepad line"}
-        placeholder={isLast && !saved ? "Write a new line…" : undefined}
-        value={text}
-        readOnly={!canEdit}
-        maxLength={MAX_NOTE_LINE}
-        onChange={(e) => handleChange(e.target.value)}
-        onBlur={() => void flush(true)}
-        onKeyDown={handleKeyDown}
-        // The whole ruled line is clickable; the top padding drops the writing
-        // onto the line.
-        className={`h-12 min-w-0 flex-1 bg-transparent pt-5 pb-0 text-2xl leading-6 outline-none placeholder:text-neutral-400 ${
-          done ? "text-neutral-400 line-through" : "text-neutral-900"
-        } ${canEdit ? "" : "cursor-default"}`}
-      />
-      <span className="mb-2.5 max-w-56 min-w-20 shrink-0 text-right font-sans text-sm">
+      {editing ? (
+        <textarea
+          ref={inputRef}
+          rows={1}
+          aria-label={isLast && !saved ? "New notepad line" : "Notepad line"}
+          placeholder={placeholder || undefined}
+          value={text}
+          maxLength={MAX_NOTE_LINE}
+          onChange={(e) => handleChange(e.target.value.replace(/\n/g, " "))}
+          onBlur={() => {
+            setEditing(false);
+            void flush(true);
+          }}
+          onKeyDown={handleKeyDown}
+          className={`${WRITING} block min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 outline-none placeholder:text-neutral-400 ${colour}`}
+        />
+      ) : (
+        // The line as text: wraps, and web links can be clicked. Tab moves
+        // here like a box would, and opens it.
+        <div
+          role={canEdit ? "textbox" : undefined}
+          aria-label={isLast && !saved ? "New notepad line" : "Notepad line"}
+          tabIndex={canEdit ? 0 : undefined}
+          onMouseDown={startEditing}
+          onFocus={(e) => {
+            if (canEdit && e.target === e.currentTarget) setEditing(true);
+          }}
+          className={`${WRITING} min-h-12 min-w-0 flex-1 break-words whitespace-pre-wrap outline-none ${colour} ${
+            canEdit ? "cursor-text" : ""
+          }`}
+        >
+          {text ? (
+            splitLinks(text).map((part, i) =>
+              part.href ? (
+                <a
+                  key={i}
+                  href={part.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all text-blue-700 underline hover:text-blue-900"
+                >
+                  {part.text}
+                </a>
+              ) : (
+                <span key={i}>{part.text}</span>
+              ),
+            )
+          ) : (
+            <span className="text-neutral-400">{placeholder}</span>
+          )}
+        </div>
+      )}
+      <span className="mt-4 max-w-56 shrink-0 text-right font-sans text-sm sm:min-w-20">
         {status.kind === "saving" && <span className="text-neutral-500">Saving…</span>}
         {status.kind === "saved" && <span className="text-green-700">Saved ✓</span>}
         {status.kind === "error" && (
@@ -430,7 +504,7 @@ function NoteRow({
         )}
       </span>
       {/* Delete: the admin any line, everyone else their own. */}
-      <span className="mb-1 w-7 shrink-0">
+      <span className="mt-3 w-7 shrink-0">
         {saved && canEdit && (
           <button
             type="button"
@@ -445,4 +519,27 @@ function NoteRow({
       </span>
     </li>
   );
+}
+
+// How many characters into the line a click landed, so the box opens with
+// the cursor there. (Links show the same characters as the text, so the
+// count is the same in the box.)
+function offsetAt(container: HTMLElement, x: number, y: number): number | null {
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+  };
+  let node: Node | null = null;
+  let offset = 0;
+  if (doc.caretPositionFromPoint) {
+    const pos = doc.caretPositionFromPoint(x, y);
+    if (pos) ({ offsetNode: node, offset } = pos);
+  } else if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(x, y);
+    if (range) ({ startContainer: node, startOffset: offset } = range);
+  }
+  if (!node || !container.contains(node)) return null;
+  const before = document.createRange();
+  before.selectNodeContents(container);
+  before.setEnd(node, offset);
+  return before.toString().length;
 }

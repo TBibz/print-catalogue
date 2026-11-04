@@ -21,3 +21,9 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Notepad paper: a light-blue rule at the bottom of every 48px line of
+   writing, so wrapped lines sit on rules too. */
+.notepad-ruled {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 47px, #bcd7f2 47px 48px);
+}

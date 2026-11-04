@@ -12,6 +12,7 @@ import {
   type ReportRow,
   type ReportTopModel,
   type ReportTotals,
+  type ReportBounds,
   type ReportView,
 } from "@/lib/reports";
 import { ROW_ALT } from "@/lib/row-highlights";
@@ -23,6 +24,7 @@ import { ROW_ALT } from "@/lib/row-highlights";
 const TABLE_COLUMNS =
   "grid-cols-[minmax(4.5rem,1fr)_3rem_4rem_5.5rem_5.5rem] md:grid-cols-[minmax(6rem,1fr)_4rem_6rem_6.5rem_6.5rem_6.5rem_6.5rem]";
 const VIEWS: { view: ReportView; label: string }[] = [
+  { view: "all", label: "All Time" },
   { view: "monthly", label: "Monthly" },
   { view: "yearly", label: "Yearly" },
   { view: "custom", label: "Custom range" },
@@ -30,7 +32,7 @@ const VIEWS: { view: ReportView; label: string }[] = [
 
 export function PrintingView({
   query,
-  defaultRange,
+  bounds,
   printers,
   rows,
   totals,
@@ -38,9 +40,9 @@ export function PrintingView({
   topModels,
 }: {
   query: ReportQuery;
-  // Today and the last 12 months (UK), worked out on the server: the
-  // starting dates for "Custom range".
-  defaultRange: { from: string; to: string };
+  // The start month (Settings → Money) and today, worked out on the server:
+  // nothing before the start month is ever shown.
+  bounds: ReportBounds;
   printers: { id: string; name: string }[];
   rows: ReportRow[];
   totals: ReportTotals;
@@ -54,7 +56,8 @@ export function PrintingView({
   function show(next: Partial<ReportQuery>) {
     const q = { ...query, ...next };
     const params = new URLSearchParams();
-    if (q.view !== "monthly") params.set("view", q.view);
+    if (q.view !== "all") params.set("view", q.view);
+    if (q.view === "monthly" && q.month) params.set("month", q.month);
     if (q.view === "custom" && q.from) params.set("from", q.from);
     if (q.view === "custom" && q.to) params.set("to", q.to);
     if (q.printerId) params.set("printer", q.printerId);
@@ -67,7 +70,7 @@ export function PrintingView({
 
   return (
     <div className={`space-y-8 transition-opacity ${pending ? "opacity-60" : ""}`} aria-busy={pending}>
-      <Controls query={query} defaultRange={defaultRange} printers={printers} onShow={show} />
+      <Controls query={query} bounds={bounds} printers={printers} onShow={show} />
 
       <p className="text-sm text-neutral-600">{periodText(query)}</p>
 
@@ -126,11 +129,10 @@ export function PrintingView({
   );
 }
 
-// "1 Dec 2025 – 4 Nov 2026" etc., so it's clear what the figures cover.
+// "1 Nov 2026 – 4 Nov 2026" etc., so it's clear what the figures cover.
 function periodText(q: ReportQuery) {
   const day = (d: string) =>
     new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  if (q.view === "yearly") return "Every year with completed print jobs. Cancelled jobs are not counted.";
   return `${q.from ? day(q.from) : "…"} – ${q.to ? day(q.to) : "…"}. Completed print jobs only; cancelled jobs are not counted.`;
 }
 
@@ -161,19 +163,20 @@ function Card({ label, value, tone = "text-neutral-900" }: { label: string; valu
 
 function Controls({
   query,
-  defaultRange,
+  bounds,
   printers,
   onShow,
 }: {
   query: ReportQuery;
-  defaultRange: { from: string; to: string };
+  bounds: ReportBounds;
   printers: { id: string; name: string }[];
   onShow: (next: Partial<ReportQuery>) => void;
 }) {
-  const [from, setFrom] = useState(query.view === "custom" && query.from ? query.from : defaultRange.from);
-  const [to, setTo] = useState(query.view === "custom" && query.to ? query.to : defaultRange.to);
-  const today = defaultRange.to;
+  const [from, setFrom] = useState(query.view === "custom" && query.from ? query.from : bounds.start);
+  const [to, setTo] = useState(query.view === "custom" && query.to ? query.to : bounds.today);
+  const thisMonth = bounds.today.slice(0, 7);
   const badRange = Boolean(from && to && from > to);
+  const tooEarly = Boolean(from && from < bounds.start);
 
   const button = (active: boolean) =>
     `rounded-md border px-4 py-2 text-base ${
@@ -192,7 +195,15 @@ function Controls({
             key={v.view}
             type="button"
             aria-pressed={query.view === v.view}
-            onClick={() => onShow(v.view === "custom" ? { view: "custom", from, to } : { view: v.view })}
+            onClick={() =>
+              onShow(
+                v.view === "custom"
+                  ? { view: "custom", from, to }
+                  : v.view === "monthly"
+                    ? { view: "monthly", month: query.month ?? thisMonth }
+                    : { view: v.view },
+              )
+            }
             className={button(query.view === v.view)}
           >
             {v.label}
@@ -200,30 +211,67 @@ function Controls({
         ))}
       </div>
 
+      {/* Monthly: which month (start month to this month). */}
+      {query.view === "monthly" && (
+        <label className="block">
+          <span className="mb-1 block text-sm text-neutral-700">Month</span>
+          <input
+            type="month"
+            value={query.month ?? thisMonth}
+            min={bounds.start.slice(0, 7)}
+            max={thisMonth}
+            onChange={(e) => {
+              const month = e.target.value;
+              if (month >= bounds.start.slice(0, 7) && month <= thisMonth) onShow({ view: "monthly", month });
+            }}
+            className={field}
+          />
+        </label>
+      )}
+
       {query.view === "custom" && (
         <form
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!badRange) onShow({ view: "custom", from, to });
+            if (!badRange && !tooEarly) onShow({ view: "custom", from, to });
           }}
         >
           <label className="block">
             <span className="mb-1 block text-sm text-neutral-700">From</span>
-            <input type="date" value={from} max={today} onChange={(e) => setFrom(e.target.value)} className={field} />
+            <input
+              type="date"
+              value={from}
+              min={bounds.start}
+              max={bounds.today}
+              onChange={(e) => setFrom(e.target.value)}
+              className={field}
+            />
           </label>
           <label className="block">
             <span className="mb-1 block text-sm text-neutral-700">To</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={field} />
+            <input
+              type="date"
+              value={to}
+              min={bounds.start}
+              max={bounds.today}
+              onChange={(e) => setTo(e.target.value)}
+              className={field}
+            />
           </label>
           <button
             type="submit"
-            disabled={!from || !to || badRange}
+            disabled={!from || !to || badRange || tooEarly}
             className="h-10 rounded-md bg-neutral-900 px-4 font-medium text-white hover:bg-neutral-700 disabled:opacity-40"
           >
             Show
           </button>
           {badRange && <span className="text-sm text-red-700">“From” is after “To”.</span>}
+          {tooEarly && (
+            <span className="text-sm text-red-700">
+              Reports start in {periodLabel(bounds.start, "monthly")} (the start month in Settings → Money).
+            </span>
+          )}
         </form>
       )}
 
