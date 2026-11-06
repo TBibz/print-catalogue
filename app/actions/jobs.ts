@@ -64,6 +64,13 @@ export async function cancelPrintJob(jobId: string): Promise<JobResult> {
   return callRpc("cancel_print_job", { p_job_id: jobId });
 }
 
+// Starts a new printing job (dated now) that copies an earlier one. Items
+// are linked to any open requests for the same thing (see
+// 0020_repeat_print_job.sql); the rest go on as "not requested".
+export async function repeatPrintJob(jobId: string): Promise<JobResult> {
+  return callRpc("repeat_print_job", { p_job_id: jobId });
+}
+
 // Deletes a job for good. A completed job is reverted first (see
 // 0009_delete_print_job.sql), so requests get back what it took off them.
 export async function deletePrintJob(jobId: string): Promise<JobResult> {

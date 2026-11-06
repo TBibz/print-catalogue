@@ -6,6 +6,7 @@ import {
   cancelPrintJob,
   completePrintJob,
   deletePrintJob,
+  repeatPrintJob,
   revertPrintJob,
   updateCompletedResult,
   updatePrintJobDetails,
@@ -29,7 +30,7 @@ import {
 // Which job has a form open, and which form.
 type Open = {
   jobId: string;
-  mode: "complete" | "cancel" | "details" | "result" | "revert" | "delete";
+  mode: "complete" | "cancel" | "details" | "result" | "revert" | "delete" | "repeat";
 } | null;
 
 // What deleting does, by status (see 0009_delete_print_job.sql).
@@ -41,7 +42,10 @@ const DELETE_TEXT: Record<Job["status"], string> = {
   cancelled: "Delete this cancelled job for good? This can't be undone.",
 };
 
-const HISTORY_COLUMNS = "md:grid-cols-[8.5rem_8.5rem_minmax(0,1fr)_5.5rem_5rem_5rem_5rem]";
+const REPEAT_TEXT =
+  "Start this plate again as a new print, dated today? It copies the printer, items, settings and costs. Anything Dad still wants is linked to his request (up to the amount still wanted); the rest goes on as not requested. You can change it afterwards with Edit details.";
+
+const HISTORY_COLUMNS = "md:grid-cols-[8.5rem_8.5rem_minmax(0,1fr)_5.5rem_5rem_5rem_7.5rem]";
 
 const STATUS_STYLES: Record<Job["status"], string> = {
   printing: "border-blue-200 bg-blue-50 text-blue-800",
@@ -84,6 +88,35 @@ export function JobsView({
   };
   const sortedHistory = [...history].sort((a, b) => finishedAt(b).localeCompare(finishedAt(a)));
 
+  // ---- Search ----------------------------------------------------------------
+  // Every word typed must appear somewhere in the job: title, notes, printer,
+  // material, status, dates, or any item's code, name, scale or colour.
+  // The job with a form open always stays visible.
+  const [query, setQuery] = useState("");
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (job: Job) => {
+    if (terms.length === 0 || open?.jobId === job.id) return true;
+    const printer = options.printers.find((p) => p.id === job.printer_id);
+    const material = options.materials.find((m) => m.id === job.material_id);
+    const haystack = [
+      job.title,
+      job.notes,
+      printer?.name,
+      material?.name,
+      STATUS_LABELS[job.status],
+      formatDate(job.started_at),
+      job.status !== "printing" ? formatDate(finishedAt(job)) : "",
+      ...job.print_job_items.map((i) => `${itemLabel(i)} ${colourOf(i, options)?.name ?? ""}`),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return terms.every((t) => haystack.includes(t));
+  };
+  const shownPrinting = printing.filter(matches);
+  const shownHistory = sortedHistory.filter(matches);
+  // "(3 of 12)" while searching, "(12)" otherwise.
+  const count = (shown: number, all: number) => (terms.length > 0 ? `${shown} of ${all}` : `${all}`);
+
   const toggle = (jobId: string, mode: NonNullable<Open>["mode"]) => {
     setMessage(null);
     setOpen((o) => (o?.jobId === jobId && o.mode === mode ? null : { jobId, mode }));
@@ -92,9 +125,28 @@ export function JobsView({
     setMessage(text);
     setOpen(null);
   };
+  // After repeating, jump to the top so the new job in "Printing now" shows.
+  const repeated = (job: Job) => {
+    done(`Repeated ${jobName(job)}: it's now in Printing now ✓`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="space-y-8">
+      <div>
+        <label htmlFor="jobs-search" className="sr-only">
+          Search jobs
+        </label>
+        <input
+          id="jobs-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by code, model, title, printer, material, date or note…"
+          className="w-full max-w-md rounded-md border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+        />
+      </div>
+
       {message && (
         <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-green-800">
           {message}
@@ -103,15 +155,17 @@ export function JobsView({
 
       <section aria-labelledby="printing-heading">
         <h2 id="printing-heading" className="mb-3 text-lg font-semibold">
-          Printing now <span className="font-normal text-neutral-500">({printing.length})</span>
+          Printing now <span className="font-normal text-neutral-500">({count(shownPrinting.length, printing.length)})</span>
         </h2>
         {printing.length === 0 ? (
           <p className="rounded-lg border border-dashed border-neutral-300 py-8 text-center text-neutral-500">
             Nothing is printing. Start a print from the Queue.
           </p>
+        ) : shownPrinting.length === 0 ? (
+          <p className="py-4 text-neutral-500">No printing jobs match “{query.trim()}”.</p>
         ) : (
           <ul className="space-y-3">
-            {printing.map((job) => {
+            {shownPrinting.map((job) => {
               const mode = open?.jobId === job.id ? open.mode : null;
               return (
                 <li key={job.id} className="rounded-lg border border-neutral-200 p-4">
@@ -122,6 +176,9 @@ export function JobsView({
                     </ActionButton>
                     <ActionButton active={mode === "details"} onClick={() => toggle(job.id, "details")}>
                       Edit details
+                    </ActionButton>
+                    <ActionButton active={mode === "repeat"} onClick={() => toggle(job.id, "repeat")}>
+                      Repeat job
                     </ActionButton>
                     <ActionButton active={mode === "cancel"} onClick={() => toggle(job.id, "cancel")}>
                       Cancel job
@@ -157,6 +214,15 @@ export function JobsView({
                       onClose={() => setOpen(null)}
                     />
                   )}
+                  {mode === "repeat" && (
+                    <Confirm
+                      text={REPEAT_TEXT}
+                      confirmLabel="Yes, start print"
+                      onConfirm={() => repeatPrintJob(job.id)}
+                      onDone={() => repeated(job)}
+                      onClose={() => setOpen(null)}
+                    />
+                  )}
                   {mode === "cancel" && (
                     <Confirm
                       text="Cancel this job? Nothing on it is counted as printed, so every request still wants these items."
@@ -175,10 +241,12 @@ export function JobsView({
 
       <section aria-labelledby="history-heading">
         <h2 id="history-heading" className="mb-3 text-lg font-semibold">
-          History <span className="font-normal text-neutral-500">({historyTotal})</span>
+          History <span className="font-normal text-neutral-500">({count(shownHistory.length, historyTotal)})</span>
         </h2>
         {sortedHistory.length === 0 ? (
           <p className="py-8 text-center text-neutral-500">No finished jobs yet.</p>
+        ) : shownHistory.length === 0 ? (
+          <p className="py-4 text-neutral-500">No finished jobs match “{query.trim()}”.</p>
         ) : (
           <div className="border-t border-neutral-200">
             <div
@@ -193,9 +261,12 @@ export function JobsView({
               <span />
             </div>
             <ul>
-              {sortedHistory.map((job) => {
+              {shownHistory.map((job) => {
                 const isOpen = open?.jobId === job.id;
                 const mode = isOpen ? open.mode : null;
+                // The repeat confirm shows on its own under the row; every
+                // other mode opens the full panel.
+                const panelOpen = isOpen && mode !== "repeat";
                 const planned = job.print_job_items.reduce((s, i) => s + i.quantity_planned, 0);
                 const succeeded = job.print_job_items.reduce((s, i) => s + (i.quantity_succeeded ?? 0), 0);
                 return (
@@ -237,17 +308,32 @@ export function JobsView({
                         <span className="font-normal md:hidden">Charge: </span>
                         {formatMoney(job.charge)}
                       </span>
-                      <button
-                        type="button"
-                        aria-expanded={isOpen}
-                        onClick={() => (isOpen ? setOpen(null) : toggle(job.id, "details"))}
-                        className="col-start-2 row-span-6 row-start-1 self-center rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 md:col-start-auto md:row-span-1 md:row-start-auto"
-                      >
-                        {isOpen ? "Close" : "Open"}
-                      </button>
+                      <span className="col-start-2 row-span-6 row-start-1 flex items-center justify-end gap-2 self-center md:col-start-auto md:row-span-1 md:row-start-auto">
+                        <button
+                          type="button"
+                          aria-expanded={panelOpen}
+                          onClick={() => (panelOpen ? setOpen(null) : toggle(job.id, "details"))}
+                          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+                        >
+                          {panelOpen ? "Close" : "Open"}
+                        </button>
+                        <RepeatButton active={mode === "repeat"} onClick={() => toggle(job.id, "repeat")} />
+                      </span>
                     </div>
 
-                    {isOpen && (
+                    {mode === "repeat" && (
+                      <div className="mx-3 mb-4">
+                        <Confirm
+                          text={REPEAT_TEXT}
+                          confirmLabel="Yes, start print"
+                          onConfirm={() => repeatPrintJob(job.id)}
+                          onDone={() => repeated(job)}
+                          onClose={() => setOpen(null)}
+                        />
+                      </div>
+                    )}
+
+                    {panelOpen && (
                       <div className="mx-3 mb-4 rounded-lg border border-neutral-200 bg-white p-4">
                         <JobSummary job={job} printerLabel={printerLabel(job.printer_id)} options={options} />
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -400,6 +486,41 @@ function JobSummary({
         {job.charge_overridden && <span className="text-neutral-500"> (set by hand)</span>}
       </p>
     </div>
+  );
+}
+
+// Small icon button (two circling arrows) that repeats a job from History.
+// The tooltip and screen-reader label say what it does.
+function RepeatButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Repeat job"
+      title="Repeat job"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex h-9 w-9 items-center justify-center rounded-md border ${
+        active
+          ? "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700"
+          : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+      }`}
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17 2l4 4-4 4" />
+        <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+        <path d="M7 22l-4-4 4-4" />
+        <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+      </svg>
+    </button>
   );
 }
 
