@@ -1,7 +1,7 @@
 -- =============================================================================
--- 0020_repeat_print_job.sql — repeat a job
+-- 0023_repeat_print_job.sql — repeat a job
 --
--- Run this whole file in the Supabase SQL Editor after 0019_invoices.sql.
+-- Run this whole file in the Supabase SQL Editor after 0022_reports_notepad_undo.sql.
 -- Safe to run again.
 --
 -- repeat_print_job(job) starts a NEW printing job (dated now) that copies an

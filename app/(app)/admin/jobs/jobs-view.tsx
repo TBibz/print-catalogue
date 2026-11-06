@@ -490,13 +490,13 @@ function JobSummary({
 }
 
 // Small icon button (two circling arrows) that repeats a job from History.
-// The tooltip and screen-reader label say what it does.
+// The app's tooltip (data-tip) and the screen-reader label say what it does.
 function RepeatButton({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       aria-label="Repeat job"
-      title="Repeat job"
+      data-tip="Repeat job"
       aria-pressed={active}
       onClick={onClick}
       className={`flex h-9 w-9 items-center justify-center rounded-md border ${
