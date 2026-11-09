@@ -3,8 +3,10 @@ import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { pickableModels } from "@/lib/jobs";
 import {
   loadCategories,
+  loadColourOptions,
   loadJobFormOptions,
   loadModels,
   loadRequestLines,
@@ -12,7 +14,6 @@ import {
 } from "@/lib/data";
 import { compareQueue } from "@/lib/requests";
 import { QueueView, type QueueRow } from "./queue-view";
-import type { PickableModel } from "./start-print-panel";
 
 export const metadata: Metadata = { title: "Queue · Print Catalogue" };
 
@@ -34,13 +35,14 @@ async function QueueData() {
   const supabase = await createClient();
   let data = null;
   try {
-    const [categories, models, lines, options, untickedNotes] = await Promise.all([
+    const [categories, models, lines, options, untickedNotes, colours] = await Promise.all([
       loadCategories(supabase),
       // Retired ("hidden") models are left out, so their lines don't show.
       loadModels(supabase),
       loadRequestLines(supabase),
       loadJobFormOptions(supabase),
       loadUntickedNoteCount(supabase),
+      loadColourOptions(supabase),
     ]);
     const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
     const modelsById = new Map(models.map((m) => [m.id, m]));
@@ -68,15 +70,8 @@ async function QueueData() {
     rows.sort(compareQueue);
 
     // Models that can be added to a plate without a request.
-    const pickable: PickableModel[] = models.map((m) => ({
-      id: m.id,
-      code: m.code,
-      name: m.name,
-      categoryName: categoryNames.get(m.category_id) ?? "",
-      default_scale: m.default_scale,
-      other_scales: m.other_scales,
-    }));
-    data = { rows, pickable, options, untickedNotes };
+    const pickable = pickableModels(models, categories);
+    data = { rows, pickable, options, untickedNotes, colours };
   } catch (error) {
     console.error("Loading the queue failed:", error);
   }
@@ -102,7 +97,7 @@ async function QueueData() {
           {data.untickedNotes} unticked notepad {data.untickedNotes === 1 ? "note" : "notes"} →
         </Link>
       </p>
-      <QueueView initialRows={data.rows} models={data.pickable} options={data.options} />
+      <QueueView initialRows={data.rows} models={data.pickable} options={data.options} colours={data.colours} />
     </>
   );
 }

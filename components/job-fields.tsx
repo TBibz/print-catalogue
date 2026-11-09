@@ -2,7 +2,8 @@
 
 // The print job details form, used by "Start print" on the queue and by
 // "Edit details" on the jobs page. Choose the printer first; then only the
-// fields for that printer type are shown (brief section 4).
+// fields for that printer type are shown (brief section 4). "Charge Dad for
+// this job" unticked hides the charge: the job is "Not charged" (0024).
 import { formatMoney, formatMoneyInput } from "@/lib/money";
 import { MoneyInput } from "@/components/money-input";
 import { ColourStripe } from "@/components/colour-label";
@@ -172,6 +173,24 @@ export function JobFields({
             </Field>
           </div>
 
+          {/* Not charged to Dad: the charge is always £0 (0024). Unticking
+              also drops a charge typed by hand, as the database does. */}
+          <label className="flex w-fit cursor-pointer items-center gap-2.5">
+            <input
+              type="checkbox"
+              checked={form.chargeable}
+              onChange={(e) =>
+                onChange(
+                  e.target.checked
+                    ? { chargeable: true }
+                    : { chargeable: false, charge: "", chargeOverridden: false },
+                )
+              }
+              className="h-5 w-5 cursor-pointer accent-neutral-900"
+            />
+            <span className="font-medium">Charge Dad for this job</span>
+          </label>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <MoneyField
               label="My cost"
@@ -189,24 +208,32 @@ export function JobFields({
                     : "Choose the filament to work this out."
               }
             />
-            <MoneyField
-              label="Charge"
-              id={id("charge")}
-              calculated={money.charge}
-              value={form.charge}
-              overridden={form.chargeOverridden}
-              onType={(v) => onChange({ charge: v, chargeOverridden: true })}
-              onReset={() => onChange({ charge: "", chargeOverridden: false })}
-              explain={
-                noCharge
-                  ? "Nothing to charge: cancelled, or nothing succeeded."
-                  : type === "resin"
-                    ? `${form.estWeightG || 0} g ÷ ${options.divisor}`
-                    : material
-                      ? `${form.estWeightG || 0} g × ${formatMoney(Number(material.charge_per_unit) * 1000)} per kg`
-                      : "Choose the filament to work this out."
-              }
-            />
+            {form.chargeable ? (
+              <MoneyField
+                label="Charge"
+                id={id("charge")}
+                calculated={money.charge}
+                value={form.charge}
+                overridden={form.chargeOverridden}
+                onType={(v) => onChange({ charge: v, chargeOverridden: true })}
+                onReset={() => onChange({ charge: "", chargeOverridden: false })}
+                explain={
+                  noCharge
+                    ? "Nothing to charge: cancelled, or nothing succeeded."
+                    : type === "resin"
+                      ? `${form.estWeightG || 0} g ÷ ${options.divisor}`
+                      : material
+                        ? `${form.estWeightG || 0} g × ${formatMoney(Number(material.charge_per_unit) * 1000)} per kg`
+                        : "Choose the filament to work this out."
+                }
+              />
+            ) : (
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="mb-1 text-sm font-medium">Charge</p>
+                <p className="py-2 text-base font-medium text-neutral-700">Not charged</p>
+                <p className="text-xs text-neutral-500">Dad isn&apos;t charged for this job. My cost still counts.</p>
+              </div>
+            )}
           </div>
         </>
       )}

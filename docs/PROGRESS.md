@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-11-04 (notepad lines and undo, Reports, Setup menu)_
+_Last updated: 2026-11-09 (repeat job and Jobs search; custom jobs and "Charge Dad for this job")_
 
 ## Phases
 
@@ -263,6 +263,21 @@ _Last updated: 2026-11-04 (notepad lines and undo, Reports, Setup menu)_
 - Current page's nav link (and "Setup ▾" and the current item in its list): "Navbar highlight" colour, bold, text white or dark by lightness. New `colour_nav_highlight` in Settings → Colours (picker, nav-style preview, Reset); no SQL needed, the default (dark purple) applies until it's first saved, and the existing settings policy already lets both roles read `colour_` keys
 - Checked in the browser pane with sample lines (temporary preview page, not committed): "Notepad (3)" with one ticked line and a blank new line not counted, highlight colours, one-line display and shortened links, click-to-edit cursor position before and after a link, editing wraps and goes back to one line. The live count after ticking/deleting wasn't checked (needs a login)
 
+### Repeat job and Jobs search: Done (0023, run in Supabase)
+- `0023_repeat_print_job.sql`: `repeat_print_job(job)` starts a new printing job (dated now) copying an earlier job's printer, details, costs set by hand and items. Catalogue items are linked to the open request for the same model, size and colour, up to what it still wants; the rest go on as not requested; free text is copied. The real work is done by `start_print_job`, so all its checks apply
+- Jobs page: "Repeat job" on printing jobs and a repeat icon on each History row (in-page confirm; the new job shows in Printing now); a search box over code, model, title, printer, material, status, dates and notes, with "(3 of 12)" counts in the headings
+- (These two commits didn't update the docs at the time; recorded here on 2026-11-09)
+
+### Custom jobs and "Charge Dad for this job": Done (0024, run in Supabase)
+- `0024_chargeable_jobs.sql`: `print_jobs.chargeable` (boolean, default true, so every existing job stays charged). `pj_set_details` reads an optional `chargeable` from the details (left out: a new job is chargeable, an edited job keeps its setting, so the old app couldn't switch it back on); `pj_refresh_money` makes a job that isn't chargeable charge £0 with no hand-typed charge, my cost as normal; `repeat_print_job` copies it. One transaction (`begin … commit`); only adds; no existing job's money was recalculated
+- Checked before running: the three replaced functions were compared line by line with the live definitions (only lines marked 0024 differ), then 0001–0024 were run in PGlite with 46 checks: existing jobs' charges, costs and `updated_at` untouched; the live app's calls give identical money, request lines, money_by_month and reports with and without 0024; not-charged jobs add £0 charge but still count cost, plates, items and weight; repeat copies the setting; permissions unchanged; safe to run twice; a failure part way changes nothing
+- Job form (`components/job-fields.tsx`, `lib/jobs.ts`): "Charge Dad for this job" tick box; unticked hides the Charge box and shows "Not charged" (My cost still shows) and clears a hand-typed charge. The live preview charges £0 too
+- Start print panel: the tick box is ticked while any queue line is on the plate and unticked for a plate of only free-text items or unrequested models; once changed by hand it's left alone (reset after each start)
+- Colour for unrequested models: an added model whose category has colour options gets the catalogue's `ColourSelect`; `PlateItem` carries `colourMaterialId` to `start_print_job` (which already accepted it). Added models' colours also count for the "same colour on the plate → pre-select that filament" rule
+- Jobs page: "Custom" (no item from a request) / "Mixed" (some) labels (`jobKind()` in `lib/jobs.ts`), "Not charged" instead of a charge, filter buttons All / Queue / Custom / Mixed next to the search (counts show "N of M" while filtering), and "+ New custom job", which opens the queue's Start print panel (the same component, with no queue lines). Edit details can change "Charge Dad" on any job
+- `PickableModel` and `pickableModels()` moved to `lib/jobs.ts` so the queue and the Jobs page share them; the Jobs page now also loads categories, models and colour options
+- Checked: `npx tsc --noEmit` and lint pass (after `next typegen` refreshed the stale `.next/types`). Screens checked in the browser pane with made-up data on a temporary preview page (not committed): tick box defaults, switching and staying as chosen; colour dropdown and filament pre-select; Custom / Mixed / Not charged labels; each filter; New custom job; Edit details tick box; phone width. Not checked logged in against the real database (Claude can't log in)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -291,6 +306,8 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0020_mark_invoice_sent.sql` | 9 | `invoices.sent_method` (existing sent ones become `email`), `mark_invoice_sent_manually()`, `unmark_invoice_sent()`; `mark_invoice_sent()` records `email` | ☐ |
 | `0021_theme_colours.sql` | 9 | colour_ settings with defaults, readable by both roles; `model_printing()` | ☐ |
 | `0022_reports_notepad_undo.sql` | 9 | printing report functions, `restore_notepad_line()` (and the notepad guard lets a restore through), `colour_head_reports` | ☐ |
+| `0023_repeat_print_job.sql` | 9+ | `repeat_print_job()`: new printing job copying an old one, linked to open requests where possible | ☑ (live) |
+| `0024_chargeable_jobs.sql` | 9+ | `print_jobs.chargeable` (default true); `pj_set_details`, `pj_refresh_money`, `repeat_print_job` handle it; only adds, one transaction | ☑ (run 2026-11-09) |
 
 Also in `supabase/snippets/` (run by hand, never automatically):
 - `make-admin.sql` (one-off, makes your account admin)
@@ -305,7 +322,6 @@ Also in `supabase/snippets/` (run by hand, never automatically):
 - Items on a printing job can't be edited; cancel it and start a new plate instead.
 - Cancelled jobs can't be reverted.
 - None of the Phase 6a/6b screens or UI fixes have been checked in a browser yet (Claude can't log in). Lint and the build pass.
-- Catalogue models added to a plate by search (not requested) can't be given a colour in the panel yet; the database supports it.
 - Drag-and-drop on the Categories page needs a mouse; on a phone or tablet use the ↑ ↓ buttons.
 - Custom domain (Phase 8) not done: it's set up in Vercel and your domain registrar, not in code.
 - In the catalogue's colour dropdown, the open list is the browser's own, so it shows names without stripes; the chosen colour shows its stripe in the box.

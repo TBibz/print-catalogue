@@ -13,7 +13,8 @@ export type JobResult = { ok: true } | { ok: false; error: string };
 // One thing on the plate.
 export type PlateItem =
   | { kind: "request"; requestLineId: string; quantity: number }
-  | { kind: "model"; modelId: string; scale: string | null; quantity: number }
+  // colourMaterialId: a colour for a model whose category has colours (null = any colour)
+  | { kind: "model"; modelId: string; scale: string | null; colourMaterialId: string | null; quantity: number }
   | { kind: "free"; name: string; quantity: number };
 
 // { item id: how many succeeded }
@@ -40,7 +41,12 @@ export async function startPrintJob(form: JobForm, items: PlateItem[]): Promise<
         case "request":
           return { request_line_id: item.requestLineId, quantity: item.quantity };
         case "model":
-          return { model_id: item.modelId, scale: item.scale, quantity: item.quantity };
+          return {
+            model_id: item.modelId,
+            scale: item.scale,
+            colour_material_id: item.colourMaterialId,
+            quantity: item.quantity,
+          };
         case "free":
           return { free_text_name: item.name, quantity: item.quantity };
       }

@@ -15,17 +15,24 @@ import {
 } from "@/app/actions/jobs";
 import { ColourLabel } from "@/components/colour-label";
 import { JobFields } from "@/components/job-fields";
+import type { ColourOption } from "@/lib/colours";
 import {
+  JOB_KIND_LABELS,
   finishedAt,
   formatDate,
   itemLabel,
   jobFormFrom,
+  jobKind,
   printTime,
   type Job,
   type JobForm,
   type JobItem,
   type JobFormOptions,
+  type JobKind,
+  type PickableModel,
 } from "@/lib/jobs";
+// The queue's Start print panel, reused for "New custom job".
+import { StartPrintPanel } from "../queue/start-print-panel";
 
 // Which job has a form open, and which form.
 type Open = {
@@ -59,19 +66,53 @@ const STATUS_LABELS: Record<Job["status"], string> = {
   cancelled: "Cancelled",
 };
 
+// The filter buttons: every job, or only queue / custom / mixed ones (jobKind).
+type KindFilter = "all" | JobKind;
+const KIND_FILTERS: { value: KindFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "queue", label: JOB_KIND_LABELS.queue },
+  { value: "custom", label: JOB_KIND_LABELS.custom },
+  { value: "mixed", label: JOB_KIND_LABELS.mixed },
+];
+
+// Small grey tags: "Custom" / "Mixed" (nothing for queue jobs), "Not charged".
+const TAG = "rounded-full border border-neutral-300 bg-white px-2 py-0.5 text-xs text-neutral-600";
+
+function JobTags({ job }: { job: Job }) {
+  const kind = jobKind(job);
+  return (
+    <>
+      {kind !== "queue" && (
+        <span
+          className={TAG}
+          data-tip={kind === "custom" ? "Nothing on this job came from the queue" : "Some items came from the queue"}
+        >
+          {JOB_KIND_LABELS[kind]}
+        </span>
+      )}
+      {!job.chargeable && <span className={TAG}>Not charged</span>}
+    </>
+  );
+}
+
 export function JobsView({
   printing,
   history,
   options,
   historyTotal,
+  models,
+  colours,
 }: {
   printing: Job[];
   history: Job[];
   options: JobFormOptions;
   historyTotal: number; // finished jobs in all (the list shows the latest HISTORY_LIMIT)
+  models: PickableModel[]; // for "New custom job"
+  colours: ColourOption[];
 }) {
   const [open, setOpen] = useState<Open>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [newCustom, setNewCustom] = useState(false); // "New custom job" panel open
 
   // Next.js keeps this page alive between visits, and every change reloads
   // the server data. When fresh jobs arrive, close any open form.
@@ -93,9 +134,13 @@ export function JobsView({
   // material, status, dates, or any item's code, name, scale or colour.
   // The job with a form open always stays visible.
   const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const filtering = terms.length > 0 || kindFilter !== "all";
   const matches = (job: Job) => {
-    if (terms.length === 0 || open?.jobId === job.id) return true;
+    if (open?.jobId === job.id) return true;
+    if (kindFilter !== "all" && jobKind(job) !== kindFilter) return false;
+    if (terms.length === 0) return true;
     const printer = options.printers.find((p) => p.id === job.printer_id);
     const material = options.materials.find((m) => m.id === job.material_id);
     const haystack = [
@@ -104,6 +149,8 @@ export function JobsView({
       printer?.name,
       material?.name,
       STATUS_LABELS[job.status],
+      JOB_KIND_LABELS[jobKind(job)],
+      job.chargeable ? "" : "not charged",
       formatDate(job.started_at),
       job.status !== "printing" ? formatDate(finishedAt(job)) : "",
       ...job.print_job_items.map((i) => `${itemLabel(i)} ${colourOf(i, options)?.name ?? ""}`),
@@ -114,8 +161,15 @@ export function JobsView({
   };
   const shownPrinting = printing.filter(matches);
   const shownHistory = sortedHistory.filter(matches);
-  // "(3 of 12)" while searching, "(12)" otherwise.
-  const count = (shown: number, all: number) => (terms.length > 0 ? `${shown} of ${all}` : `${all}`);
+  // "(3 of 12)" while searching or filtering, "(12)" otherwise.
+  const count = (shown: number, all: number) => (filtering ? `${shown} of ${all}` : `${all}`);
+  // What the "nothing matches" lines say.
+  const filterText = [
+    kindFilter !== "all" ? JOB_KIND_LABELS[kindFilter].toLowerCase() : "",
+    terms.length > 0 ? `matching “${query.trim()}”` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const toggle = (jobId: string, mode: NonNullable<Open>["mode"]) => {
     setMessage(null);
@@ -133,18 +187,64 @@ export function JobsView({
 
   return (
     <div className="space-y-8">
-      <div>
-        <label htmlFor="jobs-search" className="sr-only">
-          Search jobs
-        </label>
-        <input
-          id="jobs-search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by code, model, title, printer, material, date or note…"
-          className="w-full max-w-md rounded-md border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
-        />
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="jobs-search" className="sr-only">
+            Search jobs
+          </label>
+          <input
+            id="jobs-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by code, model, title, printer, material, date or note…"
+            className="w-full max-w-md rounded-md border border-neutral-300 px-3 py-2.5 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+          />
+          <div role="group" aria-label="Show jobs" className="flex flex-wrap gap-1.5">
+            {KIND_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={kindFilter === f.value}
+                onClick={() => setKindFilter(f.value)}
+                className={`rounded-md border px-3 py-2 text-sm ${
+                  kindFilter === f.value
+                    ? "border-neutral-900 bg-neutral-900 font-medium text-white"
+                    : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-expanded={newCustom}
+            onClick={() => {
+              setMessage(null);
+              setNewCustom((v) => !v);
+            }}
+            className={`ml-auto rounded-md border px-4 py-2 text-sm font-medium ${
+              newCustom
+                ? "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                : "border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-700"
+            }`}
+          >
+            {newCustom ? "Close" : "+ New custom job"}
+          </button>
+        </div>
+        {newCustom && (
+          <StartPrintPanel
+            title="New custom job"
+            onStarted={() => {
+              setNewCustom(false);
+              setMessage("Custom job started: it's now in Printing now ✓");
+            }}
+            models={models}
+            options={options}
+            colours={colours}
+          />
+        )}
       </div>
 
       {message && (
@@ -159,10 +259,10 @@ export function JobsView({
         </h2>
         {printing.length === 0 ? (
           <p className="rounded-lg border border-dashed border-neutral-300 py-8 text-center text-neutral-500">
-            Nothing is printing. Start a print from the Queue.
+            Nothing is printing. Start a print from the Queue, or a New custom job.
           </p>
         ) : shownPrinting.length === 0 ? (
-          <p className="py-4 text-neutral-500">No printing jobs match “{query.trim()}”.</p>
+          <p className="py-4 text-neutral-500">No {filterText} printing jobs.</p>
         ) : (
           <ul className="space-y-3">
             {shownPrinting.map((job) => {
@@ -246,7 +346,7 @@ export function JobsView({
         {sortedHistory.length === 0 ? (
           <p className="py-8 text-center text-neutral-500">No finished jobs yet.</p>
         ) : shownHistory.length === 0 ? (
-          <p className="py-4 text-neutral-500">No finished jobs match “{query.trim()}”.</p>
+          <p className="py-4 text-neutral-500">No {filterText} finished jobs.</p>
         ) : (
           <div className="border-t border-neutral-200">
             <div
@@ -288,13 +388,14 @@ export function JobsView({
                             })
                             .join(", ")}
                         </span>
-                        {job.status === "cancelled" && (
-                          <span
-                            className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-xs ${STATUS_STYLES.cancelled}`}
-                          >
-                            Cancelled
-                          </span>
-                        )}
+                        <span className="mt-1 flex flex-wrap gap-1.5 empty:hidden">
+                          {job.status === "cancelled" && (
+                            <span className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_STYLES.cancelled}`}>
+                              Cancelled
+                            </span>
+                          )}
+                          <JobTags job={job} />
+                        </span>
                       </span>
                       <span className="col-start-1 text-sm tabular-nums md:col-start-auto md:text-right">
                         <span className="md:hidden">Succeeded: </span>
@@ -306,7 +407,11 @@ export function JobsView({
                       </span>
                       <span className="col-start-1 text-sm font-medium tabular-nums md:col-start-auto md:text-right">
                         <span className="font-normal md:hidden">Charge: </span>
-                        {formatMoney(job.charge)}
+                        {job.chargeable ? (
+                          formatMoney(job.charge)
+                        ) : (
+                          <span className="font-normal text-neutral-500">Not charged</span>
+                        )}
                       </span>
                       <span className="col-start-2 row-span-6 row-start-1 flex items-center justify-end gap-2 self-center md:col-start-auto md:row-span-1 md:row-start-auto">
                         <button
@@ -460,6 +565,7 @@ function JobSummary({
         <span className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_STYLES[job.status]}`}>
           {STATUS_LABELS[job.status]}
         </span>
+        <JobTags job={job} />
         <span className="text-sm text-neutral-500">Started {formatDate(job.started_at)}</span>
       </div>
       {facts.length > 0 && <p className="mt-1 text-sm text-neutral-600">{facts.join(" · ")}</p>}
@@ -482,8 +588,14 @@ function JobSummary({
       <p className="mt-2 text-sm">
         My cost <strong className="tabular-nums">{formatMoney(job.my_cost)}</strong>
         {job.my_cost_overridden && <span className="text-neutral-500"> (set by hand)</span>} · Charge{" "}
-        <strong className="tabular-nums">{formatMoney(job.charge)}</strong>
-        {job.charge_overridden && <span className="text-neutral-500"> (set by hand)</span>}
+        {job.chargeable ? (
+          <>
+            <strong className="tabular-nums">{formatMoney(job.charge)}</strong>
+            {job.charge_overridden && <span className="text-neutral-500"> (set by hand)</span>}
+          </>
+        ) : (
+          <strong>Not charged</strong>
+        )}
       </p>
     </div>
   );

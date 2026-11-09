@@ -1,53 +1,65 @@
 "use client";
 
-// "Start a print" on the queue: what's on the plate (ticked request lines,
-// plus any catalogue models or free-text items added here), the printer and
-// its details, and the money, then one click to start the job.
+// "Start a print": what's on the plate (ticked request lines, plus any
+// catalogue models or free-text items added here), the printer and its
+// details, and the money, then one click to start the job.
+//
+// Used in two places:
+//   * the queue, with `queue` set: ticked request lines go on the plate
+//   * the Jobs page ("New custom job"), without `queue`: only catalogue
+//     models nobody requested and free-text items
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { startPrintJob, type PlateItem } from "@/app/actions/jobs";
 import { ColourLabel } from "@/components/colour-label";
 import { JobFields } from "@/components/job-fields";
+import { ColourSelect } from "@/components/request-fields";
 import { naturalCollator } from "@/lib/catalogue";
-import { emptyJobForm, type JobForm, type JobFormOptions } from "@/lib/jobs";
+import type { ColourOption } from "@/lib/colours";
+import { emptyJobForm, type JobForm, type JobFormOptions, type PickableModel } from "@/lib/jobs";
 import { scaleLabel, scaleOptions, type RequestLine } from "@/lib/requests";
 import type { QueueRow } from "./queue-view";
 
-export type PickableModel = {
-  id: string;
-  code: string;
-  name: string;
-  categoryName: string;
-  default_scale: string | null;
-  other_scales: string[];
-};
-
 // Items added in this panel (not from the queue).
 type Extra =
-  | { key: string; kind: "model"; model: PickableModel; scale: string | null; quantity: string }
+  | {
+      key: string;
+      kind: "model";
+      model: PickableModel;
+      scale: string | null;
+      colourId: string | null; // null = any colour
+      quantity: string;
+    }
   | { key: string; kind: "free"; name: string; quantity: string };
+
+// The queue's side of the panel: its ticked lines and how many of each.
+export type QueuePlate = {
+  plateRows: QueueRow[];
+  plate: Record<string, string>;
+  onPlateQty: (lineId: string, value: string) => void;
+  onUntick: (line: RequestLine) => void;
+};
 
 const box =
   "rounded-md border border-neutral-300 bg-white px-2.5 py-2 text-base outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 const MAX_MATCHES = 8;
 
 export function StartPrintPanel({
-  plateRows,
-  plate,
-  onPlateQty,
-  onUntick,
+  queue,
   onStarted,
   models,
   options,
+  colours,
+  title = "Start a print",
 }: {
-  plateRows: QueueRow[];
-  plate: Record<string, string>;
-  onPlateQty: (lineId: string, value: string) => void;
-  onUntick: (line: RequestLine) => void;
+  queue?: QueuePlate; // left out on the Jobs page (a custom job)
   onStarted: () => void;
   models: PickableModel[];
   options: JobFormOptions;
+  colours: ColourOption[]; // for models whose category has colour options
+  title?: string;
 }) {
+  const plateRows = queue?.plateRows ?? [];
   const [extras, setExtras] = useState<Extra[]>([]);
   const [form, setForm] = useState<JobForm>(emptyJobForm);
   const [search, setSearch] = useState("");
@@ -55,21 +67,38 @@ export function StartPrintPanel({
   const [started, setStarted] = useState(false);
   // true once the filament has been chosen by hand, so it's left alone.
   const [materialChosen, setMaterialChosen] = useState(false);
+  // true once "Charge Dad for this job" has been changed by hand, so it's
+  // left alone.
+  const [chargeableChosen, setChargeableChosen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const hasItems = plateRows.length > 0 || extras.length > 0;
   const update = (patch: Partial<JobForm>) => {
     // A material change on its own (not from switching printer) is a choice.
     if ("materialId" in patch && !("printerId" in patch)) setMaterialChosen(true);
+    if ("chargeable" in patch) setChargeableChosen(true);
     setForm((f) => ({ ...f, ...patch }));
     setError(null);
   };
 
+  // "Charge Dad for this job": ticked while any queue line is on the plate,
+  // unticked when it's only free-text items or models nobody requested.
+  // Once changed by hand, it stays as chosen.
+  const chargeDad = plateRows.length > 0;
+  if (!chargeableChosen && form.chargeable !== chargeDad) {
+    setForm((f) => ({
+      ...f,
+      chargeable: chargeDad,
+      ...(chargeDad ? {} : { charge: "", chargeOverridden: false }),
+    }));
+  }
+
   // On a filament printer, if every coloured item on the plate is the same
   // colour, pre-select that filament (it can still be changed).
-  const plateColours = new Set(
-    plateRows.flatMap((r) => (r.line.colour_material_id ? [r.line.colour_material_id] : [])),
-  );
+  const plateColours = new Set([
+    ...plateRows.flatMap((r) => (r.line.colour_material_id ? [r.line.colour_material_id] : [])),
+    ...extras.flatMap((e) => (e.kind === "model" && e.colourId ? [e.colourId] : [])),
+  ]);
   const sharedColour = plateColours.size === 1 ? [...plateColours][0] : null;
   const printerType = options.printers.find((p) => p.id === form.printerId)?.type;
   if (printerType === "fdm" && !materialChosen && sharedColour && form.materialId !== sharedColour) {
@@ -89,7 +118,10 @@ export function StartPrintPanel({
           .slice(0, MAX_MATCHES);
 
   function addModel(model: PickableModel) {
-    setExtras((prev) => [...prev, { key: `m-${Date.now()}`, kind: "model", model, scale: null, quantity: "1" }]);
+    setExtras((prev) => [
+      ...prev,
+      { key: `m-${Date.now()}`, kind: "model", model, scale: null, colourId: null, quantity: "1" },
+    ]);
     setSearch("");
     setStarted(false);
   }
@@ -106,7 +138,7 @@ export function StartPrintPanel({
   function plateItems(): PlateItem[] | string {
     const items: PlateItem[] = [];
     for (const r of plateRows) {
-      const qty = Number(plate[r.line.id]);
+      const qty = Number(queue?.plate[r.line.id]);
       const left = r.line.quantity - r.line.printing;
       if (!Number.isInteger(qty) || qty < 1) return `Enter how many of ${r.code} go on this plate.`;
       if (qty > left) return `${r.code} only has ${left} left to print.`;
@@ -119,7 +151,7 @@ export function StartPrintPanel({
       if (!Number.isInteger(qty) || qty < 1) return `Enter how many of ${what} go on this plate.`;
       items.push(
         e.kind === "model"
-          ? { kind: "model", modelId: e.model.id, scale: e.scale, quantity: qty }
+          ? { kind: "model", modelId: e.model.id, scale: e.scale, colourMaterialId: e.colourId, quantity: qty }
           : { kind: "free", name: e.name.trim(), quantity: qty },
       );
     }
@@ -146,6 +178,7 @@ export function StartPrintPanel({
       setExtras([]);
       setForm({ ...emptyJobForm(), printerId: form.printerId });
       setMaterialChosen(false);
+      setChargeableChosen(false);
       setStarted(true);
       onStarted();
     });
@@ -154,7 +187,7 @@ export function StartPrintPanel({
   return (
     <section aria-labelledby="start-print-heading" className="rounded-lg border border-neutral-200 p-4">
       <h2 id="start-print-heading" className="mb-1 text-lg font-semibold">
-        Start a print
+        {title}
       </h2>
 
       {started && !hasItems && (
@@ -168,7 +201,9 @@ export function StartPrintPanel({
 
       {!hasItems && (
         <p className="mb-3 text-sm text-neutral-600">
-          Tick lines in the queue below, or add a catalogue model or a free-text item.
+          {queue
+            ? "Tick lines in the queue below, or add a catalogue model or a free-text item."
+            : "Add catalogue models or free-text items. Nothing here comes off Dad's requests."}
         </p>
       )}
 
@@ -190,12 +225,12 @@ export function StartPrintPanel({
                 </span>
                 <QtyBox
                   label={`How many of ${r.code} on this plate`}
-                  value={plate[r.line.id] ?? ""}
-                  onChange={(v) => onPlateQty(r.line.id, v)}
-                  invalid={Number(plate[r.line.id]) > left || Number(plate[r.line.id]) < 1}
+                  value={queue?.plate[r.line.id] ?? ""}
+                  onChange={(v) => queue?.onPlateQty(r.line.id, v)}
+                  invalid={Number(queue?.plate[r.line.id]) > left || Number(queue?.plate[r.line.id]) < 1}
                 />
                 <span className="w-16 text-sm text-neutral-500">of {left}</span>
-                <RemoveButton label={`Take ${r.code} off the plate`} onClick={() => onUntick(r.line)} />
+                <RemoveButton label={`Take ${r.code} off the plate`} onClick={() => queue?.onUntick(r.line)} />
               </li>
             );
           })}
@@ -223,6 +258,18 @@ export function StartPrintPanel({
                     </select>
                   ) : (
                     <span className="text-sm text-neutral-500">· {scaleLabel(null, e.model.default_scale)}</span>
+                  )}
+                  {/* The catalogue's colour dropdown, for categories with colours. */}
+                  {e.model.hasColourOptions && (
+                    <span className="w-44">
+                      <ColourSelect
+                        label={`Colour for ${e.model.code}`}
+                        value={e.colourId}
+                        options={colours}
+                        disabledOptions={[]}
+                        onChange={(colourId) => changeExtra(e.key, { colourId })}
+                      />
+                    </span>
                   )}
                 </span>
               ) : (

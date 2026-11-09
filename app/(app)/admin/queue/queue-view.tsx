@@ -9,11 +9,12 @@ import {
   SaveStatusText,
   UrgencySelect,
 } from "@/components/request-fields";
-import type { JobFormOptions } from "@/lib/jobs";
+import type { JobFormOptions, PickableModel } from "@/lib/jobs";
+import type { ColourOption } from "@/lib/colours";
 import { ColourLabel } from "@/components/colour-label";
 import { stickyHeadings } from "@/components/sticky-headings";
 import { rowHighlight } from "@/lib/row-highlights";
-import { StartPrintPanel, type PickableModel } from "./start-print-panel";
+import { StartPrintPanel } from "./start-print-panel";
 
 export type QueueRow = {
   line: RequestLine;
@@ -36,10 +37,12 @@ export function QueueView({
   initialRows,
   models,
   options,
+  colours,
 }: {
   initialRows: QueueRow[];
   models: PickableModel[];
   options: JobFormOptions;
+  colours: ColourOption[];
 }) {
   const [rows, setRows] = useState(initialRows);
   // Ticked lines and how many of each go on this plate (as typed).
@@ -119,13 +122,11 @@ export function QueueView({
 
       <div ref={panelRef} className="mb-6 scroll-mt-4">
         <StartPrintPanel
-          plateRows={plateRows}
-          plate={plate}
-          onPlateQty={setPlateQty}
-          onUntick={(line) => toggle(line, false)}
+          queue={{ plateRows, plate, onPlateQty: setPlateQty, onUntick: (line) => toggle(line, false) }}
           onStarted={() => setPlate({})}
           models={models}
           options={options}
+          colours={colours}
         />
       </div>
 
