@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# data backups (scripts/backup-data.ts): real data, never committed
+/backups/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
