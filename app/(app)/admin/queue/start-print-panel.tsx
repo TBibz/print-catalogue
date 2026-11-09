@@ -67,31 +67,17 @@ export function StartPrintPanel({
   const [started, setStarted] = useState(false);
   // true once the filament has been chosen by hand, so it's left alone.
   const [materialChosen, setMaterialChosen] = useState(false);
-  // true once "Charge Dad for this job" has been changed by hand, so it's
-  // left alone.
-  const [chargeableChosen, setChargeableChosen] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  // "Charge Dad for this job" starts ticked for every new job (emptyJobForm),
+  // custom ones included; it only changes when unticked by hand.
   const hasItems = plateRows.length > 0 || extras.length > 0;
   const update = (patch: Partial<JobForm>) => {
     // A material change on its own (not from switching printer) is a choice.
     if ("materialId" in patch && !("printerId" in patch)) setMaterialChosen(true);
-    if ("chargeable" in patch) setChargeableChosen(true);
     setForm((f) => ({ ...f, ...patch }));
     setError(null);
   };
-
-  // "Charge Dad for this job": ticked while any queue line is on the plate,
-  // unticked when it's only free-text items or models nobody requested.
-  // Once changed by hand, it stays as chosen.
-  const chargeDad = plateRows.length > 0;
-  if (!chargeableChosen && form.chargeable !== chargeDad) {
-    setForm((f) => ({
-      ...f,
-      chargeable: chargeDad,
-      ...(chargeDad ? {} : { charge: "", chargeOverridden: false }),
-    }));
-  }
 
   // On a filament printer, if every coloured item on the plate is the same
   // colour, pre-select that filament (it can still be changed).
@@ -178,7 +164,6 @@ export function StartPrintPanel({
       setExtras([]);
       setForm({ ...emptyJobForm(), printerId: form.printerId });
       setMaterialChosen(false);
-      setChargeableChosen(false);
       setStarted(true);
       onStarted();
     });
