@@ -42,6 +42,11 @@ export type Job = {
   charge: number;
   charge_overridden: boolean;
   chargeable: boolean; // false = not charged to Dad (charge always 0; 0024)
+  // The material's £ per g when the job was started (or its material was
+  // last changed), 0025. Money is always worked out from these, never the
+  // material's current price. Empty on resin jobs from before 0025.
+  material_cost_per_unit: number | null;
+  material_charge_per_unit: number | null;
   print_job_items: JobItem[];
 };
 
@@ -49,6 +54,7 @@ export const JOB_COLUMNS = `
   id, printer_id, title, status, started_at, completed_at, cancelled_at, notes,
   est_material_ml, est_weight_g, print_hours, print_minutes, est_cost,
   layer_height_mm, material_id, my_cost, my_cost_overridden, charge, charge_overridden, chargeable,
+  material_cost_per_unit, material_charge_per_unit,
   print_job_items (
     id, model_id, free_text_name, request_line_id, from_request, scale, colour_material_id,
     quantity_planned, quantity_succeeded, quantity_applied_to_request,
@@ -78,7 +84,20 @@ export type JobForm = {
   charge: string;
   chargeOverridden: boolean;
   chargeable: boolean; // "Charge Dad for this job"
+  // Not typed in: what the saved job already has (0025).
+  // The prices saved on the job and which material they belong to; used
+  // while that material stays chosen. null for a new job.
+  savedRates: SavedRates | null;
+  // A resin job from before 0025: costed from the slicer's est_cost, for good.
+  oldResin: boolean;
 };
+
+export type SavedRates = { materialId: string; costPerUnit: number; chargePerUnit: number };
+
+// A resin job from before 0025 (no saved price, but a slicer cost). Same
+// rule as pj_set_details in 0025_job_material_rates.sql.
+export const isOldResinJob = (job: Pick<Job, "material_cost_per_unit" | "est_cost">) =>
+  job.material_cost_per_unit === null && job.est_cost !== null;
 
 export const emptyJobForm = (): JobForm => ({
   printerId: "",
@@ -96,6 +115,8 @@ export const emptyJobForm = (): JobForm => ({
   charge: "",
   chargeOverridden: false,
   chargeable: true,
+  savedRates: null,
+  oldResin: false,
 });
 
 const text = (n: number | null) => (n === null || n === undefined ? "" : String(Number(n)));
@@ -117,6 +138,15 @@ export function jobFormFrom(job: Job): JobForm {
     charge: formatMoneyInput(job.charge),
     chargeOverridden: job.charge_overridden,
     chargeable: job.chargeable,
+    savedRates:
+      job.material_cost_per_unit === null || !job.material_id
+        ? null
+        : {
+            materialId: job.material_id,
+            costPerUnit: Number(job.material_cost_per_unit),
+            chargePerUnit: Number(job.material_charge_per_unit ?? 0),
+          },
+    oldResin: isOldResinJob(job),
   };
 }
 
@@ -151,8 +181,11 @@ export function detailsFrom(form: JobForm) {
 // ---- Money (brief section 5) ------------------------------------------------
 // The database works this out too (pj_refresh_money); this copy is only for
 // showing the numbers live while typing.
-//   resin: my cost = the slicer's estimated cost, charge = weight ÷ divisor
+//   resin: my cost = weight × resin cost per g, charge = weight ÷ divisor
+//          (old resin jobs, form.oldResin: my cost = the slicer's est. cost)
 //   fdm:   my cost = weight × material cost per g, charge = weight × charge per g
+// The prices are the ones saved on the job while its material stays the
+// same; a new job or a newly chosen material uses today's (jobRates).
 // `noCharge`: cancelled jobs and jobs where nothing succeeded charge 0.
 // A job that isn't charged to Dad (form.chargeable false) charges 0 too.
 export function calculateMoney(
@@ -163,16 +196,32 @@ export function calculateMoney(
   noCharge = false,
 ) {
   const weight = Number(form.estWeightG) || 0;
+  const rates = jobRates(form, material);
   let myCost = 0;
   let charge = 0;
   if (printerType === "resin") {
-    myCost = parseMoney(form.estCost) || 0;
+    if (form.oldResin) myCost = parseMoney(form.estCost) || 0;
+    else if (rates) myCost = weight * rates.costPerUnit;
     charge = divisor > 0 ? weight / divisor : 0;
-  } else if (printerType === "fdm" && material) {
-    myCost = weight * Number(material.cost_per_unit);
-    charge = weight * Number(material.charge_per_unit);
+  } else if (printerType === "fdm" && rates) {
+    myCost = weight * rates.costPerUnit;
+    charge = weight * rates.chargePerUnit;
   }
   return { myCost: round2(myCost), charge: noCharge || !form.chargeable ? 0 : round2(charge) };
+}
+
+// The £ per g a job uses: what's saved on it while the same material is
+// chosen (saved: true), otherwise the chosen material's current price.
+export function jobRates(form: JobForm, material: Material | undefined) {
+  if (form.savedRates && form.savedRates.materialId === form.materialId) {
+    return { ...form.savedRates, saved: true };
+  }
+  if (!material) return null;
+  return {
+    costPerUnit: Number(material.cost_per_unit),
+    chargePerUnit: Number(material.charge_per_unit),
+    saved: false,
+  };
 }
 
 // Rounds to pence like the database does (half up). EPSILON stops values

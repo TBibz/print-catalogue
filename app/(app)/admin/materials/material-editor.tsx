@@ -13,8 +13,10 @@ import {
   per1000Label,
   TYPE_LABELS,
   unitFor,
+  unitsFor,
   type Material,
   type MaterialType,
+  type MaterialUnit,
 } from "@/lib/materials";
 import { DEFAULT_COLOUR_HEX } from "@/lib/colours";
 import { ColourLabel } from "@/components/colour-label";
@@ -34,6 +36,7 @@ function inputFrom(m: Material | null): MaterialInput {
   return {
     id: m?.id ?? null,
     type: m?.type ?? "fdm",
+    unit: m?.unit ?? "g",
     name: m?.name ?? "",
     colour: m?.colour ?? "",
     colourHex: m?.colour_hex ?? DEFAULT_COLOUR_HEX,
@@ -74,7 +77,7 @@ export function MaterialEditor({
     if (error?.field === key) setError(null);
   }
 
-  const unit = unitFor(values.type);
+  const unit = values.unit;
   // What the charge would be at 2 × cost, per kg / litre.
   const packSize = Number(values.packSize);
   const packCost = parseMoney(values.packCost) ?? NaN;
@@ -143,7 +146,11 @@ export function MaterialEditor({
             <select
               id="mat-type"
               value={values.type}
-              onChange={(e) => set("type", e.target.value as MaterialType)}
+              onChange={(e) => {
+                const type = e.target.value as MaterialType;
+                set("type", type);
+                if (!unitsFor(type).includes(values.unit)) set("unit", unitFor(type));
+              }}
               className={`${box} cursor-pointer text-sm`}
             >
               {(Object.keys(TYPE_LABELS) as MaterialType[]).map((t) => (
@@ -165,9 +172,29 @@ export function MaterialEditor({
                 onChange={(e) => set("packSize", e.target.value.replace(/[^0-9.]/g, ""))}
                 className={`${box} text-sm`}
               />
-              <span className="text-sm text-neutral-600">{unit}</span>
+              {values.type === "resin" ? (
+                // Resin is bought by weight; ml is only for older resins (0025).
+                <select
+                  aria-label="Unit"
+                  value={unit}
+                  onChange={(e) => set("unit", e.target.value as MaterialUnit)}
+                  className="cursor-pointer rounded-md border border-neutral-300 bg-white px-1 py-2 text-sm"
+                >
+                  {unitsFor("resin").map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-sm text-neutral-600">{unit}</span>
+              )}
             </div>
+            {values.type === "resin" && unit === "ml" && (
+              <p className="mt-1 text-xs text-neutral-600">New resin jobs need a resin measured in g.</p>
+            )}
             {fieldError("packSize")}
+            {fieldError("unit")}
           </div>
           <div>
             <label htmlFor="mat-pack-cost" className={fieldLabel}>

@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-11-09 (repeat job and Jobs search; custom jobs and "Charge Dad for this job")_
+_Last updated: 2026-11-10 (resin cost by weight; material prices saved on each job)_
 
 ## Phases
 
@@ -278,6 +278,13 @@ _Last updated: 2026-11-09 (repeat job and Jobs search; custom jobs and "Charge D
 - `PickableModel` and `pickableModels()` moved to `lib/jobs.ts` so the queue and the Jobs page share them; the Jobs page now also loads categories, models and colour options
 - Checked: `npx tsc --noEmit` and lint pass (after `next typegen` refreshed the stale `.next/types`). Screens checked in the browser pane with made-up data on a temporary preview page (not committed): tick box (the original automatic version); colour dropdown and filament pre-select; Custom / Mixed / Not charged labels; each filter; New custom job; Edit details tick box; phone width. Not checked logged in against the real database (Claude can't log in)
 
+### Resin cost by weight, material prices saved on each job: Done (needs `0025` run, then the app deployed)
+- `0025_job_material_rates.sql`: `print_jobs.material_cost_per_unit` and `material_charge_per_unit` (the material's prices when the job was started). Existing FDM jobs filled in from their material's current prices (only empty rows, with the `updated_at` trigger switched off for that one update, so nothing about them moves); existing resin jobs left empty. `materials` may now be resin in `g` (constraint loosened). `pj_set_details` saves the prices on a new job and on an edit only when the material changes, and needs a resin measured in g on new resin jobs (est_cost not used); `pj_refresh_money` uses the saved prices only; `repeat_print_job` gives a clear message for a resin job without a g resin. One transaction; ends with a read-only report (`fdm_jobs_that_would_change` should be 0)
+- "Old resin job" = no saved price but an `est_cost`. It keeps using `est_cost` for good, even if its resin is changed in Edit details (decision: editing an old job never changes its cost method). Switching an old resin job to the filament printer makes it a normal filament job
+- Job form (`components/job-fields.tsx`, `lib/jobs.ts`): resin → Resin dropdown required (g resins only), no Est. cost box, My cost live as "40 g × £25.00 per kg"; old resin jobs keep the Est. cost box and optional resin. The live preview uses the job's saved price while its material is unchanged ("price when started"), otherwise today's price, like the database. `JobForm` gained `savedRates` and `oldResin`
+- Materials page: resin unit choice (g / ml) next to the pack size; new materials start in g
+- Checked: 0001–0025 run in PGlite with 36 checks: every existing job's row (money, `updated_at`, everything) and `money_by_month` identical after 0025 and after running it twice; FDM prices saved; completing / editing / reverting old jobs after a price change keeps their figures; new FDM and resin jobs use today's price (40 g × £25/kg = £1.00, charge 40 ÷ 15 = £2.67); resin without a material, or with an ml one, refused with the plain-English message; old resin jobs stay on est_cost even when given a g resin; repeat takes today's prices; hand overrides and "not charged" still work; permissions unchanged. `tsc`, lint and `next build` pass. Form checked in the browser pane with made-up data on a temporary page (not committed): new resin, old resin, filament with saved price. Not checked logged in against the real database
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -308,6 +315,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0022_reports_notepad_undo.sql` | 9 | printing report functions, `restore_notepad_line()` (and the notepad guard lets a restore through), `colour_head_reports` | ☐ |
 | `0023_repeat_print_job.sql` | 9+ | `repeat_print_job()`: new printing job copying an old one, linked to open requests where possible | ☑ (live) |
 | `0024_chargeable_jobs.sql` | 9+ | `print_jobs.chargeable` (default true); `pj_set_details`, `pj_refresh_money`, `repeat_print_job` handle it; only adds, one transaction | ☑ (run 2026-11-09) |
+| `0025_job_material_rates.sql` | 9+ | `print_jobs.material_cost_per_unit` / `material_charge_per_unit` (FDM jobs filled in, resin left empty); resin materials may be `g`; `pj_set_details`, `pj_refresh_money`, `repeat_print_job` replaced (resin cost = weight × saved price per g, old resin jobs keep est_cost); one transaction, ends with a report | ☐ |
 
 Also in `supabase/snippets/` (run by hand, never automatically):
 - `make-admin.sql` (one-off, makes your account admin)
@@ -316,6 +324,8 @@ Also in `supabase/snippets/` (run by hand, never automatically):
 ## Known bugs, loose ends and decisions
 
 **Loose ends**
+- Run `0025` and deploy straight after. In between, the old app can only start a resin job with a resin measured in g chosen. Change your resins' unit to g (pack size in g, pack price) on the Materials page before starting the next resin job.
+- An old resin job with no resin (or an ml one) can't be repeated as it is: choose a g resin in Edit details first (it still costs from est_cost), then Repeat.
 - Phase 6a pages haven't been clicked through in a browser yet: that needs `0008` run in Supabase first. Use the Phase 6a test script.
 - The catalogue and queue call `catalogue_models()`, `request_line_printing()` and the other `0016` functions, so they show an error until `0016` has been run.
 - History shows the latest 200 jobs only (enough for now; add paging later if needed).

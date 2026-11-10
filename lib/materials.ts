@@ -8,8 +8,12 @@ export const TYPE_LABELS: Record<MaterialType, string> = {
   fdm: "Filament",
 };
 
-// Resin is measured in ml, filament in g.
-export const unitFor = (type: MaterialType): MaterialUnit => (type === "resin" ? "ml" : "g");
+// Filament is measured in g. Resin is bought by weight, so new resins are g
+// too (0025); older resins may still be in ml until changed on the
+// Materials page. New resin print jobs need a resin measured in g.
+export const unitsFor = (type: MaterialType): MaterialUnit[] => (type === "resin" ? ["g", "ml"] : ["g"]);
+// The unit a new material starts with.
+export const unitFor = (type: MaterialType): MaterialUnit => unitsFor(type)[0];
 
 // Prices are shown per 1000 units (per litre / per kg): easier to read and
 // type than tiny per-gram amounts, and it matches how packs are sold.

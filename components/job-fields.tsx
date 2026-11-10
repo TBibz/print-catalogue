@@ -4,11 +4,14 @@
 // "Edit details" on the jobs page. Choose the printer first; then only the
 // fields for that printer type are shown (brief section 4). "Charge Dad for
 // this job" unticked hides the charge: the job is "Not charged" (0024).
+// Resin (0025): a resin measured in g is required and my cost is weight ×
+// its price per g; only resin jobs from before 0025 (form.oldResin) still
+// show the slicer's "Est. cost" and use it.
 import { formatMoney, formatMoneyInput } from "@/lib/money";
 import { MoneyInput } from "@/components/money-input";
 import { ColourStripe } from "@/components/colour-label";
 import { tint } from "@/lib/colours";
-import { calculateMoney, type JobForm, type JobFormOptions } from "@/lib/jobs";
+import { calculateMoney, jobRates, type JobForm, type JobFormOptions } from "@/lib/jobs";
 import { TYPE_LABELS } from "@/lib/materials";
 
 const box =
@@ -32,12 +35,24 @@ export function JobFields({
   // Retired printers only show if this job already uses one.
   const printers = options.printers.filter((p) => p.active || p.id === form.printerId);
   const type = printer?.type;
-  // Materials for this printer type that are in use (or already chosen).
+  // Old resin jobs (from before 0025) keep the slicer's cost; every other
+  // resin job is costed by weight, so needs a resin measured in g.
+  const oldResin = type === "resin" && form.oldResin;
+  const newResin = type === "resin" && !form.oldResin;
+  // Materials for this printer type that are in use (or already chosen);
+  // for new resin jobs only those measured in g.
   const materials = options.materials.filter(
-    (m) => m.type === type && (m.active || m.id === form.materialId),
+    (m) =>
+      m.type === type &&
+      (m.id === form.materialId || (m.active && (!newResin || m.unit === "g"))),
   );
   const material = materials.find((m) => m.id === form.materialId);
   const money = calculateMoney(form, type, material, options.divisor, noCharge);
+  const rates = jobRates(form, material);
+  // "45 g × £25.00 per kg", saying when it's the price saved on the job.
+  const perKg = (perG: number) =>
+    `${form.estWeightG || 0} g × ${formatMoney(perG * 1000)} per kg${rates?.saved ? " (price when started)" : ""}`;
+  const noGramResin = newResin && !materials.some((m) => m.unit === "g");
   const id = (name: string) => `${idPrefix}-${name}`;
 
   // Changing printer type clears a material of the wrong type.
@@ -113,7 +128,7 @@ export function JobFields({
                 <span className="text-sm text-neutral-500">m</span>
               </div>
             </Field>
-            {type === "resin" && (
+            {oldResin && (
               <Field label="Est. cost (from slicer)" htmlFor={id("estcost")} required>
                 <MoneyInput
                   id={id("estcost")}
@@ -128,11 +143,11 @@ export function JobFields({
                 <NumberBox id={id("layer")} value={form.layerHeightMm} onChange={(v) => onChange({ layerHeightMm: v })} />
               </Field>
             )}
-            <div className={type === "fdm" ? "col-span-2" : "col-span-2 sm:col-span-3"}>
+            <div className={oldResin ? "col-span-2 sm:col-span-3" : "col-span-2"}>
               <Field
-                label={type === "fdm" ? "Filament" : "Resin (optional)"}
+                label={type === "fdm" ? "Filament" : oldResin ? "Resin (optional)" : "Resin"}
                 htmlFor={id("material")}
-                required={type === "fdm"}
+                required={!oldResin}
               >
                 <select
                   id={id("material")}
@@ -140,7 +155,7 @@ export function JobFields({
                   onChange={(e) => onChange({ materialId: e.target.value })}
                   className={`${box} cursor-pointer`}
                 >
-                  <option value="">{type === "fdm" ? "Choose…" : "—"}</option>
+                  <option value="">{oldResin ? "—" : "Choose…"}</option>
                   {materials.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -149,6 +164,16 @@ export function JobFields({
                   ))}
                 </select>
               </Field>
+              {noGramResin && (
+                <p className="mt-1 text-xs text-red-700">
+                  No resin is measured in grams (g) yet. Change its unit on the Materials page.
+                </p>
+              )}
+              {newResin && material && material.unit !== "g" && (
+                <p className="mt-1 text-xs text-red-700">
+                  {material.name} is measured in {material.unit}. Choose a resin measured in grams (g).
+                </p>
+              )}
             </div>
           </div>
 
@@ -201,11 +226,11 @@ export function JobFields({
               onType={(v) => onChange({ myCost: v, myCostOverridden: true })}
               onReset={() => onChange({ myCost: "", myCostOverridden: false })}
               explain={
-                type === "resin"
+                oldResin
                   ? "The slicer's estimated cost."
-                  : material
-                    ? `${form.estWeightG || 0} g × ${formatMoney(Number(material.cost_per_unit) * 1000)} per kg`
-                    : "Choose the filament to work this out."
+                  : rates
+                    ? perKg(rates.costPerUnit)
+                    : `Choose the ${type === "fdm" ? "filament" : "resin"} to work this out.`
               }
             />
             {form.chargeable ? (
@@ -222,8 +247,8 @@ export function JobFields({
                     ? "Nothing to charge: cancelled, or nothing succeeded."
                     : type === "resin"
                       ? `${form.estWeightG || 0} g ÷ ${options.divisor}`
-                      : material
-                        ? `${form.estWeightG || 0} g × ${formatMoney(Number(material.charge_per_unit) * 1000)} per kg`
+                      : rates
+                        ? perKg(rates.chargePerUnit)
                         : "Choose the filament to work this out."
                 }
               />

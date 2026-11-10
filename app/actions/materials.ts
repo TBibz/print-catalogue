@@ -9,9 +9,10 @@ import {
   MATERIAL_COLUMNS,
   PRINTER_COLUMNS,
   SETTINGS,
-  unitFor,
+  unitsFor,
   type Material,
   type MaterialType,
+  type MaterialUnit,
   type Printer,
 } from "@/lib/materials";
 import { parseMoney } from "@/lib/money";
@@ -76,6 +77,7 @@ export async function deletePrinter(id: string): Promise<{ ok: true } | Fail> {
 export type MaterialInput = {
   id: string | null;
   type: MaterialType;
+  unit: MaterialUnit; // filament: g; resin: g or ml (0025)
   name: string;
   colour: string;
   colourHex: string; // from the colour picker, e.g. "#111111"
@@ -103,6 +105,9 @@ export async function saveMaterial(
   const charge = parseMoney(input.chargePer1000) ?? NaN;
 
   if (!TYPES.includes(input.type)) return { ok: false, field: "type", error: "Please choose a type." };
+  if (!unitsFor(input.type).includes(input.unit)) {
+    return { ok: false, field: "unit", error: "Choose the unit." };
+  }
   if (!name) return { ok: false, field: "name", error: "Please enter a name." };
   if (name.length > 100) return { ok: false, field: "name", error: "Names can be at most 100 characters." };
   if (colour.length > 50) return { ok: false, field: "colour", error: "Colours can be at most 50 characters." };
@@ -124,7 +129,7 @@ export async function saveMaterial(
     name,
     colour,
     colour_hex: colourHex,
-    unit: unitFor(input.type),
+    unit: input.unit,
     pack_size: packSize,
     pack_cost: Math.round(packCost * 100) / 100,
     charge_overridden: Boolean(input.chargeOverridden),
