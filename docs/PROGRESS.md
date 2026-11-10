@@ -3,7 +3,7 @@
 Where the build stands against the phases in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
 Update this file and commit it at the end of every task.
 
-_Last updated: 2026-11-10 (resin cost by weight; material prices saved on each job)_
+_Last updated: 2026-11-10 (resin divisor applies to all resin jobs; resin cost by weight; material prices saved on each job)_
 
 ## Phases
 
@@ -285,6 +285,11 @@ _Last updated: 2026-11-10 (resin cost by weight; material prices saved on each j
 - Materials page: resin unit choice (g / ml) next to the pack size; new materials start in g
 - Checked: 0001–0025 run in PGlite with 36 checks: every existing job's row (money, `updated_at`, everything) and `money_by_month` identical after 0025 and after running it twice; FDM prices saved; completing / editing / reverting old jobs after a price change keeps their figures; new FDM and resin jobs use today's price (40 g × £25/kg = £1.00, charge 40 ÷ 15 = £2.67); resin without a material, or with an ml one, refused with the plain-English message; old resin jobs stay on est_cost even when given a g resin; repeat takes today's prices; hand overrides and "not charged" still work; permissions unchanged. `tsc`, lint and `next build` pass. Form checked in the browser pane with made-up data on a temporary page (not committed): new resin, old resin, filament with saved price. Not checked logged in against the real database
 
+### Resin charge divisor applies to all resin jobs: Done (needs `0026` run, then the app deployed)
+- `0026_resin_divisor_all_jobs.sql`: `pj_resin_charge_changes(divisor)` (helper, not callable by the app) lists the resin jobs whose charge differs from weight ÷ divisor: printing or completed, chargeable, charge not typed by hand, and not a completed job where nothing succeeded. `set_resin_charge_divisor(divisor, apply)` (admin only, one transaction) returns jobs changed + total before/after; with apply it saves the setting and updates those charges. One-off: recalculates existing resin jobs at the current setting (only `charge` changes; `updated_at` kept, trigger off for that update) and ends with a report (divisor, jobs_changed, total_charge_before, total_charge_after)
+- Settings: Save on the resin divisor runs the dry run and shows "This will change the charge on N resin jobs (total £X → £Y)" with Confirm and save / Cancel; nothing to change saves straight away. `saveSetting` now refuses that key, so it can't be saved without recalculating
+- Checked in PGlite (0001–0026): four resin jobs at £8.86, £10.09, £4.93, £6.97 (divisor 15) become £6.65, £7.57, £3.70, £5.23 at 20 (report £30.85 → £23.15); hand-typed, not-charged, cancelled, failed and FDM jobs untouched; only `charge` changes (every other column, items, settings, materials identical); second run changes 0; dry run changes nothing; applying 15 restores the original charges exactly; setting saved as "15" / "20.5"; 0 refused; non-admin refused; permissions. `tsc`, lint and build pass. The Settings confirm box hasn't been seen in a browser (it needs the real database)
+
 ## Migrations
 
 Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones you've run.
@@ -315,6 +320,7 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0022_reports_notepad_undo.sql` | 9 | printing report functions, `restore_notepad_line()` (and the notepad guard lets a restore through), `colour_head_reports` | ☐ |
 | `0023_repeat_print_job.sql` | 9+ | `repeat_print_job()`: new printing job copying an old one, linked to open requests where possible | ☑ (live) |
 | `0024_chargeable_jobs.sql` | 9+ | `print_jobs.chargeable` (default true); `pj_set_details`, `pj_refresh_money`, `repeat_print_job` handle it; only adds, one transaction | ☑ (run 2026-11-09) |
+| `0026_resin_divisor_all_jobs.sql` | 9+ | `set_resin_charge_divisor()` (dry run / apply) and helper; one-off recalculation of resin job charges at the current divisor, with a report; only `charge` changes | ☐ |
 | `0025_job_material_rates.sql` | 9+ | `print_jobs.material_cost_per_unit` / `material_charge_per_unit` (FDM jobs filled in, resin left empty); resin materials may be `g`; `pj_set_details`, `pj_refresh_money`, `repeat_print_job` replaced (resin cost = weight × saved price per g, old resin jobs keep est_cost); one transaction, ends with a report | ☐ |
 
 Also in `supabase/snippets/` (run by hand, never automatically):

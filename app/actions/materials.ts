@@ -178,6 +178,42 @@ export async function deleteMaterial(id: string): Promise<{ ok: true } | Fail> {
 
 // ---- Settings ---------------------------------------------------------------
 
+// What a new resin charge divisor does to existing jobs (0026): the resin
+// jobs (printing or completed, charged to Dad, charge not typed by hand)
+// whose charge changes, and the total of those charges before and after.
+export type DivisorChange = { jobsChanged: number; totalBefore: number; totalAfter: number };
+
+// apply false: dry run, nothing changes. apply true: saves the setting and
+// recalculates those charges (est. weight ÷ divisor), in one transaction.
+export async function setResinChargeDivisor(
+  value: string,
+  apply: boolean,
+): Promise<{ ok: true; change: DivisorChange } | Fail> {
+  await requireAdmin();
+  const n = Number(String(value ?? "").trim());
+  if (!(n > 0) || n > 10000) return { ok: false, error: "Enter a number above 0, e.g. 15." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .rpc("set_resin_charge_divisor", { p_divisor: n, p_apply: apply })
+    .single<{ jobs_changed: number; total_before: number; total_after: number }>();
+  if (error) {
+    console.error("set_resin_charge_divisor:", error.message);
+    if (error.code === "P0001") return { ok: false, error: error.message };
+    return { ok: false, error: "Couldn't save. Please check your connection and try again." };
+  }
+  // The Jobs, Reports and Money pages show the new charges straight away.
+  if (apply) refresh();
+  return {
+    ok: true,
+    change: {
+      jobsChanged: Number(data.jobs_changed),
+      totalBefore: Number(data.total_before),
+      totalAfter: Number(data.total_after),
+    },
+  };
+}
+
 export async function saveSetting(key: string, value: string): Promise<{ ok: true } | Fail> {
   await requireAdmin();
   const colour = isThemeKey(key);
@@ -192,10 +228,9 @@ export async function saveSetting(key: string, value: string): Promise<{ ok: tru
       return { ok: false, error: "That doesn't look like an email address." };
     }
   }
-  if (key === "resin_charge_divisor") {
-    const n = Number(trimmed);
-    if (!(n > 0) || n > 10000) return { ok: false, error: "Enter a number above 0, e.g. 15." };
-  }
+  // The divisor also recalculates resin job charges, so it has its own
+  // action (setResinChargeDivisor) with a dry run first.
+  if (key === "resin_charge_divisor") return { ok: false, error: "Use Save on the resin charge divisor." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("settings").upsert({ key, value: trimmed });

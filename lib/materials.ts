@@ -64,7 +64,7 @@ export const SETTINGS = [
   {
     key: "resin_charge_divisor",
     label: "Resin charge divisor",
-    help: "A resin print is charged at its estimated weight in grams divided by this number.",
+    help: "A resin print is charged at its estimated weight in grams divided by this number. Saving a new number also recalculates the charge on every printing and completed resin job (not ones typed by hand or not charged).",
     defaultValue: "15",
     kind: "number",
   },
