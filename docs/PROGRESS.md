@@ -320,8 +320,8 @@ Run by hand, in order, in the Supabase SQL Editor. Please tick off which ones yo
 | `0022_reports_notepad_undo.sql` | 9 | printing report functions, `restore_notepad_line()` (and the notepad guard lets a restore through), `colour_head_reports` | ☐ |
 | `0023_repeat_print_job.sql` | 9+ | `repeat_print_job()`: new printing job copying an old one, linked to open requests where possible | ☑ (live) |
 | `0024_chargeable_jobs.sql` | 9+ | `print_jobs.chargeable` (default true); `pj_set_details`, `pj_refresh_money`, `repeat_print_job` handle it; only adds, one transaction | ☑ (run 2026-11-09) |
-| `0026_resin_divisor_all_jobs.sql` | 9+ | `set_resin_charge_divisor()` (dry run / apply) and helper; one-off recalculation of resin job charges at the current divisor, with a report; only `charge` changes | ☐ |
 | `0025_job_material_rates.sql` | 9+ | `print_jobs.material_cost_per_unit` / `material_charge_per_unit` (FDM jobs filled in, resin left empty); resin materials may be `g`; `pj_set_details`, `pj_refresh_money`, `repeat_print_job` replaced (resin cost = weight × saved price per g, old resin jobs keep est_cost); one transaction, ends with a report | ☐ |
+| `0026_resin_divisor_all_jobs.sql` | 9+ | `set_resin_charge_divisor()` (dry run / apply) and helper; one-off recalculation of resin job charges at the current divisor, with a report; only `charge` changes | ☐ |
 
 Also in `supabase/snippets/` (run by hand, never automatically):
 - `make-admin.sql` (one-off, makes your account admin)
